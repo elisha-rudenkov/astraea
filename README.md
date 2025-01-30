@@ -1,44 +1,43 @@
-Astraea 🖱️👁️
+Here's the content converted to markdown:
+
+# Astraea 🖱️👁️
+
 Empower hands-free computer navigation using facial gestures.
 
 AccessiCursor is a Windows application that transforms head movements and eye states into mouse controls, designed for individuals with motor disabilities. Built with Qualcomm AI Hub's optimized models, it leverages on-device AI for real-time, privacy-focused accessibility.
 
-Key Features ✨
-Face-Driven Cursor: Map head movements to mouse navigation using the Lightweight-Face-Detection model.
+## Key Features ✨
 
-Eye Gesture Controls:
+* **Face-Driven Cursor:** Map head movements to mouse navigation using the Lightweight-Face-Detection model.
 
-Left Click: Hold eyes closed for 1-2 seconds.
+* **Eye Gesture Controls:**
+  * Left Click: Hold eyes closed for 1-2 seconds.
+  * Right Click: Double-blink detection (two rapid closures).
 
-Right Click: Double-blink detection (two rapid closures).
+* **Low-Latency Performance:** Optimized for Snapdragon X Elite laptops.
 
-Low-Latency Performance: Optimized for Snapdragon X Elite laptops.
+* **Customizable UI:** Adjust sensitivity, calibration, and gesture thresholds.
 
-Customizable UI: Adjust sensitivity, calibration, and gesture thresholds.
+## Tech Stack 🛠️
 
-Tech Stack 🛠️
-Qualcomm AI Hub Models:
+* **Qualcomm AI Hub Models:**
+  * Facial-Attribute-Detection-Quantized (eye state, liveness detection).
+  * Lightweight-Face-Detection (real-time face tracking).
 
-Facial-Attribute-Detection-Quantized (eye state, liveness detection).
+* **Python:** OpenCV for camera processing, PyQt for UI.
 
-Lightweight-Face-Detection (real-time face tracking).
+* **On-Device AI:** Deployed via Qualcomm's SNPE/QNN runtime.
 
-Python: OpenCV for camera processing, PyQt for UI.
+## How It Works 🎯
 
-On-Device AI: Deployed via Qualcomm’s SNPE/QNN runtime.
+1. **Calibrate:** Center your face in a virtual bounding box.
+2. **Move:** Deviate from the center to control the cursor directionally.
+3. **Click:** Use eye gestures for left/right clicks.
 
-How It Works 🎯
-Calibrate: Center your face in a virtual bounding box.
+## Why Astraea? 🌟
 
-Move: Deviate from the center to control the cursor directionally.
+* **Privacy-First:** No cloud processing—data stays on-device.
 
-Click: Use eye gestures for left/right clicks.
+* **Hardware-Agnostic:** Works with standard webcams.
 
-Why Astraea? 🌟
-Privacy-First: No cloud processing—data stays on-device.
-
-Hardware-Agnostic: Works with standard webcams.
-
-Open Source: Built for and by the accessibility community.
-
-
+* **Open Source:** Built for and by the accessibility community.
