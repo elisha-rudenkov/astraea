@@ -3,7 +3,7 @@
 
 Empower hands-free computer navigation using facial gestures.
 
-AccessiCursor is a Windows application that transforms head movements and eye states into mouse controls, designed for individuals with motor disabilities. Built with Qualcomm AI Hub's optimized models, it leverages on-device AI for real-time, privacy-focused accessibility.
+Astraea is a Windows application that transforms head movements and eye states into mouse controls, designed for individuals with motor disabilities. Built with Qualcomm AI Hub's optimized models, it leverages on-device AI for real-time, privacy-focused accessibility.
 
 ## Key Features ✨
 
