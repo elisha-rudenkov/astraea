@@ -138,27 +138,27 @@ def extract_face_roi(frame, detection):
 class MouseController:
     def __init__(self):
         self.calibration = None
-        self.movement_threshold = 8.0    # Threshold for movement detection
-        self.click_threshold = 10.0      # Threshold for detecting click gestures (in degrees)
-        self.click_cooldown = 0.5        # Minimum time between clicks (in seconds)
+        self.movement_threshold = 5.0     # Reduced from 8.0 for quicker response
+        self.click_threshold = 10.0      
+        self.click_cooldown = 0.5        
         self.last_click_time = 0
         
-        # Movement smoothing
-        self.smooth_window = 5
+        # Movement smoothing - reduced for faster response
+        self.smooth_window = 3           # Reduced from 5 for less lag
         self.yaw_history = deque(maxlen=self.smooth_window)
         self.pitch_history = deque(maxlen=self.smooth_window)
         
         # Screen dimensions
         self.screen_width, self.screen_height = pyautogui.size()
         
-        # Movement speed configuration
-        self.base_speed = 4.0      # Minimum movement speed (pixels per update)
-        self.max_speed = 20.0      # Maximum movement speed (pixels per update)
-        self.exp_factor = 2.0      # Exponential acceleration factor
+        # Movement speed configuration - increased for faster movement
+        self.base_speed = 8.0           # Increased from 4.0
+        self.max_speed = 40.0           # Increased from 20.0
+        self.exp_factor = 1.5           # Reduced from 2.0 for smoother acceleration
         
-        # Vertical sensitivity multipliers
-        self.up_multiplier = 1.5   # More sensitive for upward movement
-        self.down_multiplier = 1.8 # More sensitive for downward movement
+        # Vertical sensitivity multipliers - adjusted for better control
+        self.up_multiplier = 1.8        # Increased from 1.5
+        self.down_multiplier = 2.0      # Increased from 1.8
 
     def calibrate(self, angles):
         self.calibration = {
