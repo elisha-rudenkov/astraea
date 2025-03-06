@@ -27,6 +27,9 @@ class MouseController:
         
         self.up_multiplier = 1.8
         self.down_multiplier = 2.0
+        
+        # Add a movement pause flag
+        self.movement_paused = False
 
         # Disable pyautogui's fail-safe
         pyautogui.FAILSAFE = False
@@ -71,7 +74,8 @@ class MouseController:
             else:
                 y_speed = raw_y_speed * self.down_multiplier
             
-            if x_speed != 0 or y_speed != 0:
+            # Only move the cursor if movement is not paused
+            if (x_speed != 0 or y_speed != 0) and not self.movement_paused:
                 current_x, current_y = pyautogui.position()
                 new_x = min(max(current_x + x_speed, 0), self.screen_width)
                 new_y = min(max(current_y + y_speed, 0), self.screen_height)

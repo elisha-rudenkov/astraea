@@ -1,5 +1,6 @@
 import cv2
 import logging
+import keyboard  # You'll need to install this: pip install keyboard
 from src.detectors.face_detector import FaceDetector, extract_face_roi
 from src.analyzers.landmark_analyzer import FaceLandmarkAnalyzer
 from src.controllers.mouse_controller import MouseController
@@ -28,6 +29,9 @@ def main():
         if not ret:
             logger.error("Failed to grab frame")
             break
+        
+        # Check if spacebar is pressed using the keyboard module
+        mouse_controller.movement_paused = keyboard.is_pressed('space')
             
         detections = face_detector.detect_faces(frame)
         
@@ -43,6 +47,7 @@ def main():
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     
                     key = cv2.waitKey(1) & 0xFF
+                    
                     if calibration_mode:
                         if key == ord('c'):
                             mouse_controller.calibrate(analysis_result)
@@ -64,6 +69,11 @@ def main():
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                         cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        
+                        # Display pause status
+                        if mouse_controller.movement_paused:
+                            cv2.putText(frame, "MOVEMENT PAUSED", (10, 130),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                     except Exception as e:
                         logger.error(f"Error displaying results: {str(e)}")
         
