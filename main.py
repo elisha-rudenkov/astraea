@@ -58,11 +58,11 @@ def main():
                         
                         cv2.putText(frame, calibration_text, (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}°", (10, 60),
+                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 60),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}°", (10, 80),
+                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 80),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Roll: {roll:>6.1f}°", (10, 100),
+                        cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     except Exception as e:
                         logger.error(f"Error displaying results: {str(e)}")

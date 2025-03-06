@@ -16,7 +16,7 @@ pyautogui.FAILSAFE = False
 def angle_difference(new_angle, calibration_angle):
     """
     Computes the minimal difference between two angles (in degrees)
-    while properly handling the wrap-around at ±180°.
+    while properly handling the wrap-around at ±180deg.
     Returns a value in the range [-180, 180].
     """
     diff = new_angle - calibration_angle

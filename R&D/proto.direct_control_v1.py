@@ -170,11 +170,11 @@ class DirectMouseController:
                 if roll_diff > self.click_threshold:
                     pyautogui.click(button='right')
                     self.last_click_time = current_time
-                    logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}°)")
+                    logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}deg)")
                 elif roll_diff < -self.click_threshold:
                     pyautogui.click(button='left')
                     self.last_click_time = current_time
-                    logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}°)")
+                    logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}deg)")
 
 def draw_calibration_overlay(frame, controller):
     """Draw calibration target and instructions on the frame"""

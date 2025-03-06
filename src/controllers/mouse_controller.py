@@ -39,7 +39,7 @@ class MouseController:
         }
         self.yaw_history.clear()
         self.pitch_history.clear()
-        logger.info(f"Calibrated at: Pitch={angles['pitch']:.1f}°, Yaw={angles['yaw']:.1f}°, Roll={angles['roll']:.1f}°")
+        logger.info(f"Calibrated at: Pitch={angles['pitch']:.1f}deg, Yaw={angles['yaw']:.1f}deg, Roll={angles['roll']:.1f}deg")
 
     def get_movement_speed(self, angle_diff):
         if abs(angle_diff) < self.movement_threshold:
@@ -84,8 +84,8 @@ class MouseController:
             if roll_diff > self.click_threshold:
                 pyautogui.click(button='right')
                 self.last_click_time = current_time
-                logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}°)")
+                logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}deg)")
             elif roll_diff < -self.click_threshold:
                 pyautogui.click(button='left')
                 self.last_click_time = current_time
-                logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}°)") 
+                logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}deg)") 

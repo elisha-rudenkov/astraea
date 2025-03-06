@@ -16,7 +16,7 @@ pyautogui.FAILSAFE = False
 def angle_difference(new_angle, calibration_angle):
     """
     Computes the minimal difference between two angles (in degrees)
-    while properly handling the wrap-around at ±180°.
+    while properly handling the wrap-around at ±180deg.
     Returns a value in the range [-180, 180].
     """
     diff = new_angle - calibration_angle
@@ -169,7 +169,7 @@ class MouseController:
         # Clear history on calibration.
         self.yaw_history.clear()
         self.pitch_history.clear()
-        logger.info(f"Calibrated at: Pitch={angles['pitch']:.1f}°, Yaw={angles['yaw']:.1f}°, Roll={angles['roll']:.1f}°")
+        logger.info(f"Calibrated at: Pitch={angles['pitch']:.1f}deg, Yaw={angles['yaw']:.1f}deg, Roll={angles['roll']:.1f}deg")
 
     def get_movement_speed(self, angle_diff):
         """Calculate exponential movement speed based on angle difference."""
@@ -224,11 +224,11 @@ class MouseController:
             if roll_diff > self.click_threshold:
                 pyautogui.click(button='right')
                 self.last_click_time = current_time
-                logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}°)")
+                logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}deg)")
             elif roll_diff < -self.click_threshold:
                 pyautogui.click(button='left')
                 self.last_click_time = current_time
-                logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}°)")
+                logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}deg)")
 
 def main():
     logger.info("Initializing application...")
@@ -284,11 +284,11 @@ def main():
                         
                         cv2.putText(frame, calibration_text, (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}°", (10, 60),
+                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 60),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}°", (10, 80),
+                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 80),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Roll: {roll:>6.1f}°", (10, 100),
+                        cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     except Exception as e:
                         logger.error(f"Error displaying results: {str(e)}")
