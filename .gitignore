@@ -25,6 +25,7 @@ wheels/
 venv/
 ENV/
 .env
+.venv/
 
 # IDEs
 .idea/
@@ -36,6 +37,7 @@ ENV/
 *.log
 settings.json
 config.ini
+speech_to_text.npz
 
 # OS specific
 .DS_Store
