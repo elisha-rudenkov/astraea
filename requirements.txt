@@ -5,6 +5,7 @@ pyautogui>=0.9.53
 keyboard
 qai-hub-models[whisper-tiny-en]
 sounddevice
+pyqt6
 # UI frameworks (uncomment preferred choice):
 # tkinter  # Usually comes with Python
 # PyQt5>=5.15.0
