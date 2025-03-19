@@ -4,6 +4,7 @@ import keyboard  # You'll need to install this: pip install keyboard
 from src.detectors.face_detector import FaceDetector, extract_face_roi
 from src.analyzers.landmark_analyzer import FaceLandmarkAnalyzer
 from src.controllers.mouse_controller import MouseController
+from src.controllers.voice_controller import SpeechToCommand
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,6 +15,8 @@ def main():
     face_detector = FaceDetector()
     landmark_analyzer = FaceLandmarkAnalyzer()
     mouse_controller = MouseController()
+    voice_controller = SpeechToCommand()
+    voice_controller.start()
     
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():

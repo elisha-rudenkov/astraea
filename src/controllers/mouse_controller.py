@@ -81,15 +81,15 @@ class MouseController:
                 new_y = min(max(current_y + y_speed, 0), self.screen_height)
                 pyautogui.moveTo(new_x, new_y)
         
-        roll_diff = angle_difference(angles['roll'], self.calibration['roll'])
-        current_time = time.time()
+        # roll_diff = angle_difference(angles['roll'], self.calibration['roll'])
+        # current_time = time.time()
         
-        if current_time - self.last_click_time > self.click_cooldown:
-            if roll_diff > self.click_threshold:
-                pyautogui.click(button='right')
-                self.last_click_time = current_time
-                logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}deg)")
-            elif roll_diff < -self.click_threshold:
-                pyautogui.click(button='left')
-                self.last_click_time = current_time
-                logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}deg)") 
+        # if current_time - self.last_click_time > self.click_cooldown:
+        #     if roll_diff > self.click_threshold:
+        #         pyautogui.click(button='right')
+        #         self.last_click_time = current_time
+        #         logger.debug(f"Right click triggered (roll_diff: {roll_diff:.1f}deg)")
+        #     elif roll_diff < -self.click_threshold:
+        #         pyautogui.click(button='left')
+        #         self.last_click_time = current_time
+        #         logger.debug(f"Left click triggered (roll_diff: {roll_diff:.1f}deg)") 
