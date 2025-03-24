@@ -2,13 +2,15 @@ import cv2
 import numpy as np
 import onnxruntime
 import logging
+from src.utils.onnx_utils import create_inference_session
 
 logger = logging.getLogger(__name__)
 
 class FaceDetector:
-    def __init__(self, model_path='models/face_det_lite.onnx'):
+    def __init__(self, model_path='models/face_det_lite.onnx', use_gpu=True):
         logger.info(f"Initializing FaceDetector with model: {model_path}")
-        self.session = onnxruntime.InferenceSession(model_path)
+        # Use the GPU-accelerated session creation utility
+        self.session = create_inference_session(model_path, use_gpu)
         self.input_name = self.session.get_inputs()[0].name
         self.input_shape = self.session.get_inputs()[0].shape
         logger.debug(f"Face detector input shape: {self.input_shape}")

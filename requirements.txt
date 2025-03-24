@@ -3,8 +3,22 @@ mediapipe>=0.8.0
 numpy>=1.19.0
 pyautogui>=0.9.53
 keyboard
+onnxruntime>=1.15.0  # Default CPU version
 qai-hub-models[whisper-tiny-en]
 sounddevice
+PyQt6>=6.0.0
+
+# GPU Acceleration Options (uncomment only ONE based on your GPU):
+# -------------------------------------------------------------
+# For NVIDIA GPUs (CUDA):
+# onnxruntime-gpu>=1.15.0
+
+# For Windows with DirectX 12 compatible GPUs (AMD, Intel, NVIDIA):
+# onnxruntime-directml>=1.15.0
+
+# For AMD GPUs with ROCm support:
+# onnxruntime-rocm>=1.15.0
+
 # UI frameworks (uncomment preferred choice):
 # tkinter  # Usually comes with Python
 # PyQt5>=5.15.0
