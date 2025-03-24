@@ -10,13 +10,13 @@ sounddevice
 # GPU Acceleration Options (uncomment only ONE based on your GPU):
 # -------------------------------------------------------------
 # For NVIDIA GPUs (CUDA):
-# onnxruntime-gpu>=1.15.0
+onnxruntime-gpu>=1.15.0
 
 # For Windows with DirectX 12 compatible GPUs (AMD, Intel, NVIDIA):
-# onnxruntime-directml>=1.15.0
+onnxruntime-directml
 
 # For AMD GPUs with ROCm support:
-# onnxruntime-rocm>=1.15.0
+onnxruntime-rocm
 
 pyqt6
 # UI frameworks (uncomment preferred choice):

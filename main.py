@@ -1,7 +1,7 @@
 import cv2
 import logging
-import keyboard  # You'll need to install this: pip install keyboard
-import argparse  # Add argparse for command-line arguments
+import keyboard  
+import argparse 
 from src.detectors.face_detector import FaceDetector, extract_face_roi
 from src.analyzers.landmark_analyzer import FaceLandmarkAnalyzer
 from src.controllers.mouse_controller import MouseController
