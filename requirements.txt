@@ -6,7 +6,6 @@ keyboard
 onnxruntime>=1.15.0  # Default CPU version
 qai-hub-models[whisper-tiny-en]
 sounddevice
-PyQt6>=6.0.0
 
 # GPU Acceleration Options (uncomment only ONE based on your GPU):
 # -------------------------------------------------------------
@@ -19,6 +18,7 @@ PyQt6>=6.0.0
 # For AMD GPUs with ROCm support:
 # onnxruntime-rocm>=1.15.0
 
+pyqt6
 # UI frameworks (uncomment preferred choice):
 # tkinter  # Usually comes with Python
 # PyQt5>=5.15.0
