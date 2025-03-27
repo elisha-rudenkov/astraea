@@ -2,13 +2,14 @@ import cv2
 import numpy as np
 import onnxruntime
 import logging
+from src.utils.onnx_utils import create_inference_session
 
 logger = logging.getLogger(__name__)
 
 class FaceLandmarkAnalyzer:
-    def __init__(self, model_path='models/mediapipe_face-mediapipefacelandmarkdetector.onnx'):
+    def __init__(self, model_path='models/mediapipe_face-mediapipefacelandmarkdetector.onnx', use_gpu=True):
         logger.info(f"Initializing FaceLandmarkAnalyzer with model: {model_path}")
-        self.session = onnxruntime.InferenceSession(model_path)
+        self.session = create_inference_session(model_path, use_gpu)
         
         self.input_details = self.session.get_inputs()
         self.output_details = self.session.get_outputs()

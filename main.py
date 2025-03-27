@@ -1,10 +1,12 @@
 import cv2
 import logging
-import keyboard  # You'll need to install this: pip install keyboard
+import keyboard  
+import argparse 
 from src.detectors.face_detector import FaceDetector, extract_face_roi
 from src.analyzers.landmark_analyzer import FaceLandmarkAnalyzer
 from src.controllers.mouse_controller import MouseController
 from src.controllers.voice_controller import SpeechToCommand
+from src.utils.onnx_utils import get_available_providers, check_provider_performance  # Import utility functions
 
 from src.ui.settings import MainWindow
 import threading
@@ -20,9 +22,36 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def main():
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Head-based mouse controller")
+    parser.add_argument("--no-gpu", action="store_true", help="Disable GPU acceleration for ONNX models")
+    parser.add_argument("--benchmark", action="store_true", help="Run a performance benchmark of all available providers")
+    args = parser.parse_args()
+    
+    # Determine whether to use GPU acceleration
+    use_gpu = not args.no_gpu
+    
+    # Log available providers
+    available_providers = get_available_providers()
+    logger.info(f"Available ONNX Runtime providers: {available_providers}")
+    if use_gpu:
+        logger.info("GPU acceleration is enabled (use --no-gpu to disable)")
+        if not any(p for p in available_providers if p not in ['CPUExecutionProvider', 'AzureExecutionProvider']):
+            logger.warning("No GPU acceleration providers detected! Only CPU will be used.")
+            logger.warning("To enable GPU acceleration, install onnxruntime-gpu or follow setup instructions in README.")
+    else:
+        logger.info("GPU acceleration is disabled")
+    
+    # If the benchmark flag is set, run performance benchmarks
+    if args.benchmark:
+        logger.info("Running performance benchmark...")
+        # Use the first model for benchmarking
+        check_provider_performance("models/face_det_lite.onnx")
+        return  # Exit after benchmarking
+    
     logger.info("Initializing application...")
-    face_detector = FaceDetector()
-    landmark_analyzer = FaceLandmarkAnalyzer()
+    face_detector = FaceDetector(use_gpu=use_gpu)
+    landmark_analyzer = FaceLandmarkAnalyzer(use_gpu=use_gpu)
     mouse_controller = MouseController()
     voice_controller = SpeechToCommand()
     voice_controller.start()
