@@ -24,7 +24,9 @@ import pyautogui
 import threading
 import time
 
-from collections.abc import Callable
+
+from collections.abc import Callable    # Function type hinting
+import json                             # Loading in custom commands
 
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
@@ -50,7 +52,7 @@ class SpeechToCommand:
         # Dictionary for all commands
         self.commands = {}
 
-        # Default commands
+        # Default commands - Always in Astrea
         self.commands['left'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='left'))
         self.commands['right'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='right'))
 
@@ -65,6 +67,56 @@ class SpeechToCommand:
 
         # Callbacks for recalibrating
         self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
+
+        '''
+        Commands are stored in JSON with the format:
+
+        <word/phrase> :
+            "needsActivation": true or false
+            "type": shortcut or macro
+            "keys": list of pyautogui keys
+        
+        word/phrase: what needs to be said to be activated
+        needsActivation: whether or not 'start listening' needs to be said first
+        keys: the keystrokes of the command 
+
+        '''
+
+        # Load additional commands - User's local commands
+        with open('src\\commands.json', 'r') as f:
+            customCommands : dict = json.load(f)
+            
+            for newCommand, info in customCommands.items():
+                
+                # Check if there's no command under that phrase
+                if newCommand not in self.commands:
+                    # Get command information
+                    needsActivation : bool = info['needsActivation']
+                    inputType : str = info['type']
+                    inputKeys : list[str] = info['keys']
+
+                    # Loads the command correctly based on information
+                    commandMap = {
+                        (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
+                        (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
+                        (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
+                        (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
+                    }
+
+                    formattedCommand = commandMap.get((needsActivation, inputType), None)
+                    
+                    # Skip command if anything if can't match with a command format
+                    if formattedCommand is None:
+                        continue
+
+                    self.commands[newCommand] = formattedCommand
+
+                else:
+                    # Skip commands that already have the same name
+                    continue
+
+        
+
         
     # Only allows a command to activate if the voice module is on
     def __perform_if_active(self, action : Callable):
@@ -113,8 +165,8 @@ class SpeechToCommand:
                 print(clean_text)
 
                 # Check commands; Only one command can activate at a time
-                for key, command in self.commands.items():
-                    if key in clean_text:
+                for phrase, command in self.commands.items():
+                    if phrase in clean_text:
                         command()
                         break
 
