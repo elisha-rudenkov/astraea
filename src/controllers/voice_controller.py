@@ -120,7 +120,6 @@ class SpeechToCommand:
                         continue
 
                     self.commands[newCommand] = formattedCommand
-                    print('Command:', newCommand)
 
                 else:
                     # Skip commands that already have the same name
