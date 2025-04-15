@@ -6,6 +6,7 @@ keyboard
 onnxruntime>=1.15.0  # Default CPU version
 qai-hub-models[whisper-tiny-en]
 sounddevice
+jsonschema
 
 # GPU Acceleration Options (uncomment only ONE based on your GPU):
 # -------------------------------------------------------------

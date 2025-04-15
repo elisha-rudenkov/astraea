@@ -27,6 +27,9 @@ import time
 
 from collections.abc import Callable    # Function type hinting
 import json                             # Loading in custom commands
+from jsonschema import validate, ValidationError
+
+# TODO: Validate incoming keys and make PR.
 
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
@@ -85,15 +88,22 @@ class SpeechToCommand:
         # Load additional commands - User's local commands
         with open('src\\commands.json', 'r') as f:
             customCommands : dict = json.load(f)
-            
+
             for newCommand, info in customCommands.items():
                 
                 # Check if there's no command under that phrase
                 if newCommand not in self.commands:
+
+                    # Do not attempt to read the command info if it's incomplete
+                    if not self.__isCommandFormatted(info):
+                        continue
+
                     # Get command information
                     needsActivation : bool = info['needsActivation']
                     inputType : str = info['type']
                     inputKeys : list[str] = info['keys']
+
+                    
 
                     # Loads the command correctly based on information
                     commandMap = {
@@ -110,12 +120,37 @@ class SpeechToCommand:
                         continue
 
                     self.commands[newCommand] = formattedCommand
+                    print('Command:', newCommand)
 
                 else:
                     # Skip commands that already have the same name
                     continue
 
+    
+    # Returns if the provided JSON written command info is formatted correctly
+    def __isCommandFormatted(self, info : dict) -> bool:
+       
+       # Format for the JSON commands
+        schema = {
+            "type" : "object",
+            "properties" : {
+                "needsActivation": {"type" : "boolean"},
+                "type" : {"type" : "string"},
+                "keys" : {"type" : "array", "items" : {"type" : "string"}}
+            },
+            "required": ["needsActivation", "type", "keys"],
+            "additionalProperties" : False
+        }
+
+        # Check if information matches correctly
+        try:
+            validate(instance=info, schema=schema)
+        except ValidationError:
+            return False
         
+        # Passed all tests
+        return True
+
 
         
     # Only allows a command to activate if the voice module is on
