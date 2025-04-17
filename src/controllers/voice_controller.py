@@ -165,6 +165,7 @@ class SpeechToCommand:
                     needsActivation : bool = info['needsActivation']
                     inputType : str = info['type']
                     inputKeys : list[str] = info['keys']
+                    desc : str = info['desc']
 
                     
 
@@ -176,13 +177,13 @@ class SpeechToCommand:
                         (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
                     }
 
-                    formattedCommand = commandMap.get((needsActivation, inputType), None)
+                    commandFunc = commandMap.get((needsActivation, inputType), None)
                     
                     # Skip command if anything if can't match with a command format
-                    if formattedCommand is None:
+                    if commandFunc is None:
                         continue
 
-                    self.commands[newCommand] = formattedCommand
+                    self.commands[newCommand] = self.__formatCommand(commandFunc, desc)
 
                 else:
                     # Skip commands that already have the same name
