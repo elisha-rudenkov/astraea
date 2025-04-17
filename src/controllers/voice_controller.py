@@ -55,22 +55,85 @@ class SpeechToCommand:
         # Dictionary for all commands
         self.commands = {}
 
+        # Load the commands in
+        self.__loadDefaultCommands(cb_calibrate)
+        self.__loadAdditionalJSONCommands()
+
+    # Returns a dict of the function and description together for storage
+    def __formatCommand(self, func : Callable, desc : str) -> dict:
+        return { "action" : func, "desc" : desc }
+
+    # Returns if the provided JSON written command info is formatted correctly
+    def __isCommandFormatted(self, info : dict) -> bool:
+       
+       # Format for the JSON commands
+        schema = {
+            "type" : "object",
+            "properties" : {
+                "needsActivation": {"type" : "boolean"},
+                "type" : {"type" : "string"},
+                "keys" : {"type" : "array", "items" : {"type" : "string"}},
+                "desc" : {"type" : "string"}
+            },
+            "required": ["needsActivation", "type", "keys", "desc"],
+            "additionalProperties" : False
+        }
+
+        # Check if information matches correctly
+        try:
+            validate(instance=info, schema=schema)
+        except ValidationError:
+            return False
+        
+        # Passed all tests
+        return True
+    
+    def __loadDefaultCommands(self, cb_calibrate : Callable):
         # Default commands - Always in Astrea
-        self.commands['left'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='left'))
-        self.commands['right'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='right'))
+        command_definitions = {
+            'left': (
+                lambda: self.__perform_if_active(lambda: pyautogui.click(button='left')),
+                "mouse left click"
+            ),
+            'right': (
+                lambda: self.__perform_if_active(lambda: pyautogui.click(button='right')),
+                "mouse right click"
+            ),
+            'hold': (
+                lambda: self.__perform_if_active(pyautogui.mouseDown),
+                "mouse hold down left click"
+            ),
+            'release': (
+                lambda: self.__perform_if_active(pyautogui.mouseUp),
+                "mouse release left click"
+            ),
+            'pause mouse': (
+                lambda: self.__perform_if_active(lambda: setattr(self, 'isMousePaused', True)),
+                "pause head-mouse movement"
+            ),
+            'resume mouse': (
+                lambda: self.__perform_if_active(lambda: setattr(self, 'isMousePaused', False)),
+                "resume head-mouse movement"
+            ),
+            'start listening': (
+                lambda: (print('Commands enabled ✔️'), setattr(self, 'isActive', True)),
+                "activate voice commands"
+            ),
+            'stop listening': (
+                lambda: (print('Commands disabled ❌'), setattr(self, 'isActive', False)),
+                "deactivate voice commands"
+            ),
+            'calibrate': (
+                lambda: self.__perform_if_active(cb_calibrate),
+                "calibrate/recalibrate head position for mouse movement"
+            )
+        }
 
-        self.commands['hold'] = lambda : self.__perform_if_active(pyautogui.mouseDown)
-        self.commands['release'] = lambda : self.__perform_if_active(pyautogui.mouseUp)
+        # Adds the default commands to the dictionary
+        for name, (action, description) in command_definitions.items():
+            self.commands[name] = self.__formatCommand(action, description)
 
-        self.commands['pause mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', True))
-        self.commands['resume mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', False))
-
-        self.commands['start listening'] = lambda: (print('Commands enabled ✔️'), setattr(self, 'isActive', True))
-        self.commands['stop listening'] = lambda: (print('Commands disabled ❌'), setattr(self, 'isActive', False))
-
-        # Callbacks for recalibrating
-        self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
-
+    def __loadAdditionalJSONCommands(self):
         '''
         Commands are stored in JSON with the format:
 
@@ -78,11 +141,11 @@ class SpeechToCommand:
             "needsActivation": true or false
             "type": shortcut or macro
             "keys": list of pyautogui keys
+            "desc"
         
         word/phrase: what needs to be said to be activated
         needsActivation: whether or not 'start listening' needs to be said first
         keys: the keystrokes of the command 
-
         '''
 
         # Load additional commands - User's local commands
@@ -125,33 +188,6 @@ class SpeechToCommand:
                     # Skip commands that already have the same name
                     continue
 
-    
-    # Returns if the provided JSON written command info is formatted correctly
-    def __isCommandFormatted(self, info : dict) -> bool:
-       
-       # Format for the JSON commands
-        schema = {
-            "type" : "object",
-            "properties" : {
-                "needsActivation": {"type" : "boolean"},
-                "type" : {"type" : "string"},
-                "keys" : {"type" : "array", "items" : {"type" : "string"}}
-            },
-            "required": ["needsActivation", "type", "keys"],
-            "additionalProperties" : False
-        }
-
-        # Check if information matches correctly
-        try:
-            validate(instance=info, schema=schema)
-        except ValidationError:
-            return False
-        
-        # Passed all tests
-        return True
-
-
-        
     # Only allows a command to activate if the voice module is on
     def __perform_if_active(self, action : Callable):
         if self.isActive:
@@ -199,13 +235,18 @@ class SpeechToCommand:
                 print(clean_text)
 
                 # Check commands; Only one command can activate at a time
-                for phrase, command in self.commands.items():
+                for phrase, command_info in self.commands.items():
                     if phrase in clean_text:
-                        command()
+                        command_info['action']()
                         break
 
             # Keeps thread alive with 10ms delay for performance
             time.sleep(0.01)
+
+    # Returns a dictionary of all the commands in astrea
+    def getVoiceCommands() -> dict:
+
+        return {}
 
     # Starts all the threads
     def start(self):
