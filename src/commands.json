@@ -2,16 +2,19 @@
     "copy": {
         "needsActivation": true,
         "type": "shortcut",
-        "keys": ["ctrl","c"]
+        "keys": ["ctrl","c"],
+        "desc": "copy highlighted text or content"
     },
     "paste": {
         "needsActivation": true,
         "type": "shortcut",
-        "keys": ["ctrl","v"]
+        "keys": ["ctrl","v"],
+        "desc": "paste from clipboard"
     },
     "easter egg": {
         "needsActivation": false,
         "type": "macro",
-        "keys": ["e", "a", "s", "t", "e", "r", " ", "e", "g", "g"]
+        "keys": ["e", "a", "s", "t", "e", "r", " ", "e", "g", "g"],
+        "desc": "writes out the 'words easter egg'"
     }
 }
