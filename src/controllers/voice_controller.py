@@ -245,9 +245,15 @@ class SpeechToCommand:
             time.sleep(0.01)
 
     # Returns a dictionary of all the commands in astrea
-    def getVoiceCommands() -> dict:
-        # TODO: Return dictionary without the lamda functions
-        return {}
+    def getVoiceCommands(self) -> dict:
+        
+        # Get the phrase to description only
+        stripped_commands = {
+            phrase : {key: value for key, value in details if key == 'desc'}
+            for phrase, details in self.commands.items()
+        }
+
+        return stripped_commands
 
     # Starts all the threads
     def start(self):
