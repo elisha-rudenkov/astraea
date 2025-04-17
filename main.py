@@ -49,13 +49,26 @@ def main():
         check_provider_performance("models/face_det_lite.onnx")
         return  # Exit after benchmarking
     
+    def calibrate():
+        nonlocal calibrated, calibration_text
+        if last_analysis_result is not None:
+            mouse_controller.calibrate(last_analysis_result)
+            logger.info("Calibration complete!")
+            window.update_calibration_status(True, last_analysis_result)
+            calibrated = True
+            calibration_text = "Calibration complete!"
+        else:
+            logger.warning("No analysis data available for calibration.")
+
+
     logger.info("Initializing application...")
     face_detector = FaceDetector(use_gpu=use_gpu)
     landmark_analyzer = FaceLandmarkAnalyzer(use_gpu=use_gpu)
     mouse_controller = MouseController()
-    voice_controller = SpeechToCommand()
+    voice_controller = SpeechToCommand(calibrate)
     voice_controller.start()
     
+
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         logger.error("Cannot open camera")
@@ -72,17 +85,6 @@ def main():
     window = MainWindow()
 
     window.register_mouse_controller(mouse_controller)
-        
-    def calibrate():
-        nonlocal calibrated, calibration_text
-        if last_analysis_result is not None:
-            mouse_controller.calibrate(last_analysis_result)
-            logger.info("Calibration complete!")
-            window.update_calibration_status(True, last_analysis_result)
-            calibrated = True
-            calibration_text = "Calibration complete!"
-        else:
-            logger.warning("No analysis data available for calibration.")
 
     # Register calibration function to button
     window.register_calibrate_callback(calibrate)
@@ -96,7 +98,7 @@ def main():
             return
         
         # Check if spacebar is pressed using the keyboard module
-        mouse_controller.movement_paused = keyboard.is_pressed('space')
+        mouse_controller.movement_paused = keyboard.is_pressed('space') or voice_controller.isMousePaused
         
         # Detect faces in the frame
         detections = face_detector.detect_faces(frame)

@@ -24,12 +24,22 @@ import pyautogui
 import threading
 import time
 
+
+from collections.abc import Callable    # Function type hinting
+import json                             # Loading in custom commands
+from jsonschema import validate, ValidationError
+
+# TODO: Validate incoming keys and make PR.
+
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
     DURATION = 3                                # Length of chunks fed into model
     MODEL_CLS : type[Whisper] = WhisperTinyEn   # Model classifiation
 
-    def __init__(self, debugMode : bool = False):
+    isActive : bool = False                     # Determines whether commands are executed or not
+    isMousePaused : bool = False                # Determines if mouse is paused by voice commands
+
+    def __init__(self, cb_calibrate : Callable, debugMode : bool = False):
         # Queue of input words to be read
         self.audio_queue = queue.Queue()
 
@@ -41,6 +51,112 @@ class SpeechToCommand:
 
         # Turns on/off the print debug
         self.debugMode = debugMode
+
+        # Dictionary for all commands
+        self.commands = {}
+
+        # Default commands - Always in Astrea
+        self.commands['left'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='left'))
+        self.commands['right'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='right'))
+
+        self.commands['hold'] = lambda : self.__perform_if_active(pyautogui.mouseDown)
+        self.commands['release'] = lambda : self.__perform_if_active(pyautogui.mouseUp)
+
+        self.commands['pause mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', True))
+        self.commands['resume mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', False))
+
+        self.commands['start listening'] = lambda: (print('Commands enabled ✔️'), setattr(self, 'isActive', True))
+        self.commands['stop listening'] = lambda: (print('Commands disabled ❌'), setattr(self, 'isActive', False))
+
+        # Callbacks for recalibrating
+        self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
+
+        '''
+        Commands are stored in JSON with the format:
+
+        <word/phrase> :
+            "needsActivation": true or false
+            "type": shortcut or macro
+            "keys": list of pyautogui keys
+        
+        word/phrase: what needs to be said to be activated
+        needsActivation: whether or not 'start listening' needs to be said first
+        keys: the keystrokes of the command 
+
+        '''
+
+        # Load additional commands - User's local commands
+        with open('src\\commands.json', 'r') as f:
+            customCommands : dict = json.load(f)
+
+            for newCommand, info in customCommands.items():
+                
+                # Check if there's no command under that phrase
+                if newCommand not in self.commands:
+
+                    # Do not attempt to read the command info if it's incomplete
+                    if not self.__isCommandFormatted(info):
+                        continue
+
+                    # Get command information
+                    needsActivation : bool = info['needsActivation']
+                    inputType : str = info['type']
+                    inputKeys : list[str] = info['keys']
+
+                    
+
+                    # Loads the command correctly based on information
+                    commandMap = {
+                        (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
+                        (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
+                        (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
+                        (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
+                    }
+
+                    formattedCommand = commandMap.get((needsActivation, inputType), None)
+                    
+                    # Skip command if anything if can't match with a command format
+                    if formattedCommand is None:
+                        continue
+
+                    self.commands[newCommand] = formattedCommand
+
+                else:
+                    # Skip commands that already have the same name
+                    continue
+
+    
+    # Returns if the provided JSON written command info is formatted correctly
+    def __isCommandFormatted(self, info : dict) -> bool:
+       
+       # Format for the JSON commands
+        schema = {
+            "type" : "object",
+            "properties" : {
+                "needsActivation": {"type" : "boolean"},
+                "type" : {"type" : "string"},
+                "keys" : {"type" : "array", "items" : {"type" : "string"}}
+            },
+            "required": ["needsActivation", "type", "keys"],
+            "additionalProperties" : False
+        }
+
+        # Check if information matches correctly
+        try:
+            validate(instance=info, schema=schema)
+        except ValidationError:
+            return False
+        
+        # Passed all tests
+        return True
+
+
+        
+    # Only allows a command to activate if the voice module is on
+    def __perform_if_active(self, action : Callable):
+        if self.isActive:
+            return action()
+        return lambda : None # no-op (no operation)
 
     # Method to be used on a separate thread for constant audio input
     def __record_audio(self):
@@ -71,9 +187,6 @@ class SpeechToCommand:
     # Reads audio sent from recording thread and transcribes it
     def __transcribe_audio(self):
 
-        # Determines whether commands are executed or not
-        isActive : bool = False 
-
         while True:
             # Grab from the queue if something in there
             if not self.audio_queue.empty():
@@ -85,29 +198,14 @@ class SpeechToCommand:
 
                 print(clean_text)
 
-                # List of commands; Only one command can activate at a time
-                # TODO: This is a temporary implement for showcase purposes
-                if isActive:
-                    if 'right' in clean_text:
-                        pyautogui.click(button='right')
-                    elif 'left' in clean_text:
-                        pyautogui.click(button='left')
-                    elif 'hold' in clean_text:
-                        pyautogui.mouseDown()
-                    elif 'release' in clean_text:
-                        pyautogui.mouseUp()
-                    elif 'stop listening' in clean_text:
-                        print('Commands disabled ❌')
-                        isActive = False
+                # Check commands; Only one command can activate at a time
+                for phrase, command in self.commands.items():
+                    if phrase in clean_text:
+                        command()
+                        break
 
-                else:
-                    if 'start listening' in clean_text:
-                        print('Commands enabled ✔️')
-                        isActive = True
-
-                
-            # Keeps thread alive
-            time.sleep(0.0)
+            # Keeps thread alive with 10ms delay for performance
+            time.sleep(0.01)
 
     # Starts all the threads
     def start(self):
