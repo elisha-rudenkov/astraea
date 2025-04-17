@@ -249,7 +249,7 @@ class SpeechToCommand:
         
         # Get the phrase to description only
         stripped_commands = {
-            phrase : {key: value for key, value in details if key == 'desc'}
+            phrase : {key: value for key, value in details.items() if key == 'desc'}
             for phrase, details in self.commands.items()
         }
 
