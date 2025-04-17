@@ -246,7 +246,7 @@ class SpeechToCommand:
 
     # Returns a dictionary of all the commands in astrea
     def getVoiceCommands() -> dict:
-
+        # TODO: Return dictionary without the lamda functions
         return {}
 
     # Starts all the threads
