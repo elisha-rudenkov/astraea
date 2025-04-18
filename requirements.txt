@@ -17,10 +17,14 @@ onnxruntime-gpu>=1.15.0
 onnxruntime-directml
 
 # For AMD GPUs with ROCm support:
-onnxruntime-rocm
+#onnxruntime-rocm
 
 pyqt6
 # UI frameworks (uncomment preferred choice):
 # tkinter  # Usually comes with Python
 # PyQt5>=5.15.0
 # wxPython>=4.1.0 
+
+# Additional dependencies for build
+psutil
+
