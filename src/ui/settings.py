@@ -4,9 +4,11 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QTextEdit, QWi
                               QTabWidget, QStackedWidget, QGraphicsRectItem, QGraphicsScene,
                               QGraphicsView, QGraphicsTextItem, QGraphicsProxyWidget, QScrollArea, 
                               QGroupBox, QHBoxLayout)
-from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase
+from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase, QPaintEvent
 from PyQt6 import QtCore, QtWidgets, QtGui
+
+from typing import Optional
 
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
@@ -47,23 +49,32 @@ class OverlayWindow(QWidget):
         desktop = QApplication.primaryScreen().geometry()
         self.move(desktop.width() - self.width() - 20, 20)
 
-    def paintEvent(self, event):
+        timer = QTimer()
+        timer.timeout.connect(self.paintEvent)
+        timer.start(30)
+
+    def paintEvent(self, event : QPaintEvent):
         # Custom paint event to draw the overlay rectangle
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Draw semi-transparent background
-        painter.setBrush(QColor(40, 40, 40, 180))  # Dark gray with alpha
-        painter.setPen(QPen(QColor(60, 60, 220), 2))  # Blue border
-        painter.drawRoundedRect(0, 0, self.width() - 1, self.height() - 1, 10, 10)
+        dirty_rect = event.rect()
+        painter.drawRect(dirty_rect)
 
-        # Draw text (Change to live transcription - WIP)
-        painter.setPen(QColor(255, 255, 255))  # White text
-        font = painter.font()
-        font.setPointSize(12)
-        painter.setFont(font)
-        painter.drawText(10, 30, "Transcription line 1")
-        painter.drawText(10, 60, "Transcription line 2")
+        print("painted!")
+
+        # Draw semi-transparent background
+        # painter.setBrush(QColor(40, 40, 40, 180))  # Dark gray with alpha
+        # painter.setPen(QPen(QColor(60, 60, 220), 2))  # Blue border
+        # painter.drawRoundedRect(0, 0, self.width() - 1, self.height() - 1, 10, 10)
+
+        # # Draw text (Change to live transcription - WIP)
+        # painter.setPen(QColor(255, 255, 255))  # White text
+        # font = painter.font()
+        # font.setPointSize(12)
+        # painter.setFont(font)
+        # painter.drawText(10, 30, "Transcription line 1")
+        # painter.drawText(10, 60, "Transcription line 2")
 
 # Main window for Astrea
 class MainWindow(QMainWindow):
