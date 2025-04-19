@@ -29,122 +29,28 @@ from collections.abc import Callable    # Function type hinting
 import json                             # Loading in custom commands
 from jsonschema import validate, ValidationError
 
-phrase_to_key = {
-    # Punctuation and symbols
-    "tab": "\t",
-    "new line": "\n",
-    "return": "\r",
-    "space": " ",
-    "exclamation mark": "!",
-    "double quote": '"',
-    "hash": "#",
-    "dollar": "$",
-    "percent": "%",
-    "and sign": "&",
-    "single quote": "'",
-    "left parenthesis": "(",
-    "right parenthesis": ")",
-    "asterisk": "*",
-    "plus": "+",
-    "comma": ",",
-    "dash": "-",
-    "period": ".",
-    "slash": "/",
-    "backslash": "\\",
-    "colon": ":",
-    "semicolon": ";",
-    "less than": "<",
-    "equal": "=",
-    "greater than": ">",
-    "question mark": "?",
-    "at sign": "@",
-    "left bracket": "[",
-    "right bracket": "]",
-    "hat": "^",
-    "underscore": "_",
-    "back tick": "`",
-    "grave": "`",
-    "left brace": "{",
-    "pipe": "|",
-    "right brace": "}",
-    "tilda": "~",
-    
-    # Arrow keys
-    "up arrow": "up",
-    "down arrow": "down",
-    "left arrow": "left",
-    "right arrow": "right",
+import command_maker as cm
 
-    # Other keys
-    "enter": "enter",
-    "escape": "esc",
-    "backspace": "backspace",
-    "delete": "delete",
-    "insert": "insert",
-    "home": "home",
-    "end": "end",
-    "page up": "pageup",
-    "page down": "pagedown",
-    "control": "ctrl",
-    "control left": "ctrlleft",
-    "control right": "ctrlright",
-    "alt": "alt",
-    "alternative": "alt",
-    "alt left": "altleft",
-    "alternative left": "altleft",
-    "alt right": "altright",
-    "alternative right": "altright",
-    "shift": "shift",
-    "shift left": "shiftleft",
-    "shift right": "shiftright",
-    "caps lock": "capslock",
-    "print screen": "printscreen",
-    "printscreen": "printscreen",
-    "volume up": "volumeup",
-    "volume down": "volumedown",
-    "mute": "volumemute",
-    "play pause": "playpause",
-    "next track": "nexttrack",
-    "previous track": "prevtrack",
-    "stop": "stop",
-    "command": "command",
-    "option": "option",
-    "option left": "optionleft",
-    "option right": "optionright",
-    "windows": "win",
-    "windows left": "winleft",
-    "windows right": "winright",
+'''
+Make a button that opens an overlay
+The overlay asks 'How many words for your phrase?'
+    User says 'number __'
+    'Confirm'
+Phrase?
+    Gets the (#) of words in the beginning of a phrase
+    'Confirm'
+Needs activation?
+    'Yes' or 'No'
+    'Confirm'
+Type?
+    'shortcut' or 'macro'
+    'Confirm'
+Keys?
+    'control' 'Confirm' etc.
+    'Done'
 
-    "confirm": "confirm",
-    "cancel": "cancel",
-    "done": "done",
+'''
 
-    # Function keys
-    **{f"f {i}": f"f{i}" for i in range(1, 25)},
-
-    # Numbers
-    "number zero": "0",
-    "number one": "1",
-    "number two": "2",
-    "number to": "2",   # misrecognition-safe
-    "number too": "2",
-    "number three": "3",
-    "number four": "4",
-    "number for": "4",
-    "number five": "5",
-    "number six": "6",
-    "number seven": "7",
-    "number eight": "8",
-    "number ate": "8",
-    "number nine": "9",
-    **{f"number {num}": num for num in "0123456789"},
-
-    # Letters - Some keys need to be written out phonetically
-    **{f"letter {char}": char for char in "abcdefghijklmnopqrstuvwxyz"},
-    "let her see" : "c",
-    "let her are" : "r",
-    "let her you" : "u"
-}
 
 
 class SpeechToCommand:
@@ -166,13 +72,14 @@ class SpeechToCommand:
         # Instance of the transcribing app
         self.app = WhisperApp(SpeechToCommand.MODEL_CLS.from_pretrained())
 
+        # Instance of the command maker
+        self.commandMaker = cm.CommandMaker()
+
         # Turns on/off the print debug
         self.debugMode = debugMode
 
         # Dictionary for all commands
         self.commands = {}
-        self.loaded : str = ''
-        self.command = []
 
         # Default commands - Always in Astrea
         self.commands['left'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='left'))
@@ -211,40 +118,7 @@ class SpeechToCommand:
             customCommands : dict = json.load(f)
 
             for newCommand, info in customCommands.items():
-                
-                # Check if there's no command under that phrase
-                if newCommand not in self.commands:
-
-                    # Do not attempt to read the command info if it's incomplete
-                    if not self.__isCommandFormatted(info):
-                        continue
-
-                    # Get command information
-                    needsActivation : bool = info['needsActivation']
-                    inputType : str = info['type']
-                    inputKeys : list[str] = info['keys']
-
-                    
-
-                    # Loads the command correctly based on information
-                    commandMap = {
-                        (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
-                        (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
-                        (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
-                        (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
-                    }
-
-                    formattedCommand = commandMap.get((needsActivation, inputType), None)
-                    
-                    # Skip command if anything if can't match with a command format
-                    if formattedCommand is None:
-                        continue
-
-                    self.commands[newCommand] = formattedCommand
-
-                else:
-                    # Skip commands that already have the same name
-                    continue
+                self.__loadInCommand(newCommand, info)
 
     
     # Returns if the provided JSON written command info is formatted correctly
@@ -277,11 +151,46 @@ class SpeechToCommand:
             return action()
         return lambda : None # no-op (no operation)
 
+    def __loadInCommand(self, newCommand : str, info : dict):
+        # Check if there's no command under that phrase
+        if newCommand not in self.commands:
+
+            # Do not attempt to read the command info if it's incomplete
+            if not self.__isCommandFormatted(info):
+                return
+
+            # Get command information
+            needsActivation : bool = info['needsActivation']
+            inputType : str = info['type']
+            inputKeys : list[str] = info['keys']
+
+
+            # Loads the command correctly based on information
+            commandMap = {
+                (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
+                (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
+                (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
+                (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
+            }
+
+            formattedCommand = commandMap.get((needsActivation, inputType), None)
+            
+            # Skip command if anything if can't match with a command format
+            if formattedCommand is None:
+                return
+
+            self.commands[newCommand] = formattedCommand
+
+        else:
+            # Skip commands that already have the same name
+            return
+
+
+    # TODO: Remove this once GUI is ready. Used for function testing.
     def __speechMakeCommand(self):
         self.isMakingCommand = True
-        print('> Welcome to Making a Command <')
-        print('How many words for command?')
-        return
+        print('NOTE: GUI isnt ready if youre seeing this')
+
 
 
     # Method to be used on a separate thread for constant audio input
@@ -320,45 +229,47 @@ class SpeechToCommand:
 
                 # Removes non-alphanumeric characters
                 transcription = self.app.transcribe(audio_chunk, self.SAMPLE_RATE)
-                clean_text = transcription.translate(self.translator).lower()                
+                clean_text = transcription.translate(self.translator).lower()
 
+                # Only activate commands if we're not making one
                 if not self.isMakingCommand:
-                    print(clean_text)
-                    # Check commands; Only one command can activate at a time
-                    for phrase, command in self.commands.items():
-                        if phrase in clean_text:
-                            command()
-                            break
+                    self.__checkForCommandUsage(clean_text)
                 else:
-                    
-                    for phrase, key in phrase_to_key.items():
-                        if phrase in clean_text:
-
-                            if phrase == 'confirm':
-                                self.command.append(self.loaded)
-                                print(self.loaded, '✔️')
-                                self.loaded = None
-                            elif phrase == 'done':
-                                new_command = self.command
-                                print('New Command :)')
-                                print(new_command)
-                                self.isMakingCommand = False
-                                pyautogui.hotkey(new_command)
-
-                                self.command.clear()
-                            else:
-                                self.loaded = key
-                                print('Set?: ', key)
-                            
-                            break
-
-
-
-
-                
+                    self.__checkCommandCreation(clean_text)
+  
 
             # Keeps thread alive with 10ms delay for performance
             time.sleep(0.01)
+
+    # Check commands; Only one command can activate at a time
+    def __checkForCommandUsage(self, clean_text : str):
+        print(clean_text)
+
+        for phrase, command in self.commands.items():
+            if phrase in clean_text:
+                command()
+                break   
+
+    # Walks through the command process
+    def __checkCommandCreation(self, clean_text : str):
+        # Adds the command that was created once done
+        newCommand = self.commandMaker.makerHandler(clean_text)
+        if newCommand is not None:
+            cleanCommand = next(iter(newCommand.items()))
+            self.__loadInCommand(cleanCommand[0], cleanCommand[1])
+
+            with open('src\\commands.json', 'r+') as f:
+                commands : dict
+                commands = json.load(f)
+                commands.update(newCommand)
+
+                f.seek(0)
+                json.dump(commands, f, indent=4, separators=(', ', ': '))
+                f.truncate()
+
+            self.isMakingCommand = False
+
+
 
     # Starts all the threads
     def start(self):
