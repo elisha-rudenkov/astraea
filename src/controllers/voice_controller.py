@@ -117,6 +117,7 @@ phrase_to_key = {
 
     "confirm": "confirm",
     "cancel": "cancel",
+    "done": "done",
 
     # Function keys
     **{f"f {i}": f"f{i}" for i in range(1, 25)},
@@ -145,12 +146,14 @@ phrase_to_key = {
     "let her you" : "u"
 }
 
+
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
     DURATION = 3                                # Length of chunks fed into model
     MODEL_CLS : type[Whisper] = WhisperTinyEn   # Model classifiation
 
     isActive : bool = False                     # Determines whether commands are executed or not
+    isMakingCommand : bool = False              # Determines whether a command making process is going
     isMousePaused : bool = False                # Determines if mouse is paused by voice commands
 
     def __init__(self, cb_calibrate : Callable = None, debugMode : bool = False):
@@ -168,6 +171,8 @@ class SpeechToCommand:
 
         # Dictionary for all commands
         self.commands = {}
+        self.loaded : str = ''
+        self.command = []
 
         # Default commands - Always in Astrea
         self.commands['left'] = lambda : self.__perform_if_active(lambda: pyautogui.click(button='left'))
@@ -184,6 +189,8 @@ class SpeechToCommand:
 
         # Callbacks for recalibrating
         self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
+
+        self.commands['command'] = lambda : self.__speechMakeCommand()
 
         '''
         Commands are stored in JSON with the format:
@@ -263,14 +270,18 @@ class SpeechToCommand:
         
         # Passed all tests
         return True
-
-
         
     # Only allows a command to activate if the voice module is on
     def __perform_if_active(self, action : Callable):
         if self.isActive:
             return action()
         return lambda : None # no-op (no operation)
+
+    def __speechMakeCommand(self):
+        self.isMakingCommand = True
+        print('> Welcome to Making a Command <')
+        return
+
 
     # Method to be used on a separate thread for constant audio input
     def __record_audio(self):
@@ -308,15 +319,40 @@ class SpeechToCommand:
 
                 # Removes non-alphanumeric characters
                 transcription = self.app.transcribe(audio_chunk, self.SAMPLE_RATE)
-                clean_text = transcription.translate(self.translator).lower()
+                clean_text = transcription.translate(self.translator).lower()                
 
-                #print(clean_text)
+                if not self.isMakingCommand:
+                    print(clean_text)
+                    # Check commands; Only one command can activate at a time
+                    for phrase, command in self.commands.items():
+                        if phrase in clean_text:
+                            command()
+                            break
+                else:
+                    
+                    for phrase, key in phrase_to_key.items():
+                        if phrase in clean_text:
 
-                # Check commands; Only one command can activate at a time
-                for phrase in phrase_to_key.keys():
-                    if phrase in clean_text:
-                        print('Matched!:',phrase_to_key[phrase])
-                        break
+                            if phrase == 'confirm':
+                                self.command.append(self.loaded)
+                                print(self.loaded, '✔️')
+                                self.loaded = None
+                            elif phrase == 'done':
+                                new_command = self.command
+                                print('New Command :)')
+                                print(new_command)
+                                self.isMakingCommand = False
+                                self.command.clear()
+                            else:
+                                self.loaded = key
+                                print('Set?: ', key)
+                            
+                            break
+
+
+
+
+                
 
             # Keeps thread alive with 10ms delay for performance
             time.sleep(0.01)
