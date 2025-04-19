@@ -280,6 +280,7 @@ class SpeechToCommand:
     def __speechMakeCommand(self):
         self.isMakingCommand = True
         print('> Welcome to Making a Command <')
+        print('How many words for command?')
         return
 
 
@@ -342,6 +343,8 @@ class SpeechToCommand:
                                 print('New Command :)')
                                 print(new_command)
                                 self.isMakingCommand = False
+                                pyautogui.hotkey(new_command)
+
                                 self.command.clear()
                             else:
                                 self.loaded = key
