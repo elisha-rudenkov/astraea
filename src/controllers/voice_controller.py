@@ -29,7 +29,121 @@ from collections.abc import Callable    # Function type hinting
 import json                             # Loading in custom commands
 from jsonschema import validate, ValidationError
 
-# TODO: Validate incoming keys and make PR.
+phrase_to_key = {
+    # Punctuation and symbols
+    "tab": "\t",
+    "new line": "\n",
+    "return": "\r",
+    "space": " ",
+    "exclamation mark": "!",
+    "double quote": '"',
+    "hash": "#",
+    "dollar": "$",
+    "percent": "%",
+    "and sign": "&",
+    "single quote": "'",
+    "left parenthesis": "(",
+    "right parenthesis": ")",
+    "asterisk": "*",
+    "plus": "+",
+    "comma": ",",
+    "dash": "-",
+    "period": ".",
+    "slash": "/",
+    "backslash": "\\",
+    "colon": ":",
+    "semicolon": ";",
+    "less than": "<",
+    "equal": "=",
+    "greater than": ">",
+    "question mark": "?",
+    "at sign": "@",
+    "left bracket": "[",
+    "right bracket": "]",
+    "hat": "^",
+    "underscore": "_",
+    "back tick": "`",
+    "grave": "`",
+    "left brace": "{",
+    "pipe": "|",
+    "right brace": "}",
+    "tilda": "~",
+    
+    # Arrow keys
+    "up arrow": "up",
+    "down arrow": "down",
+    "left arrow": "left",
+    "right arrow": "right",
+
+    # Other keys
+    "enter": "enter",
+    "escape": "esc",
+    "backspace": "backspace",
+    "delete": "delete",
+    "insert": "insert",
+    "home": "home",
+    "end": "end",
+    "page up": "pageup",
+    "page down": "pagedown",
+    "control": "ctrl",
+    "control left": "ctrlleft",
+    "control right": "ctrlright",
+    "alt": "alt",
+    "alternative": "alt",
+    "alt left": "altleft",
+    "alternative left": "altleft",
+    "alt right": "altright",
+    "alternative right": "altright",
+    "shift": "shift",
+    "shift left": "shiftleft",
+    "shift right": "shiftright",
+    "caps lock": "capslock",
+    "print screen": "printscreen",
+    "printscreen": "printscreen",
+    "volume up": "volumeup",
+    "volume down": "volumedown",
+    "mute": "volumemute",
+    "play pause": "playpause",
+    "next track": "nexttrack",
+    "previous track": "prevtrack",
+    "stop": "stop",
+    "command": "command",
+    "option": "option",
+    "option left": "optionleft",
+    "option right": "optionright",
+    "windows": "win",
+    "windows left": "winleft",
+    "windows right": "winright",
+
+    "confirm": "confirm",
+    "cancel": "cancel",
+
+    # Function keys
+    **{f"f {i}": f"f{i}" for i in range(1, 25)},
+
+    # Numbers
+    "number zero": "0",
+    "number one": "1",
+    "number two": "2",
+    "number to": "2",   # misrecognition-safe
+    "number too": "2",
+    "number three": "3",
+    "number four": "4",
+    "number for": "4",
+    "number five": "5",
+    "number six": "6",
+    "number seven": "7",
+    "number eight": "8",
+    "number ate": "8",
+    "number nine": "9",
+    **{f"number {num}": num for num in "0123456789"},
+
+    # Letters - Some keys need to be written out phonetically
+    **{f"letter {char}": char for char in "abcdefghijklmnopqrstuvwxyz"},
+    "let her see" : "c",
+    "let her are" : "r",
+    "let her you" : "u"
+}
 
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
@@ -39,7 +153,7 @@ class SpeechToCommand:
     isActive : bool = False                     # Determines whether commands are executed or not
     isMousePaused : bool = False                # Determines if mouse is paused by voice commands
 
-    def __init__(self, cb_calibrate : Callable, debugMode : bool = False):
+    def __init__(self, cb_calibrate : Callable = None, debugMode : bool = False):
         # Queue of input words to be read
         self.audio_queue = queue.Queue()
 
@@ -196,12 +310,12 @@ class SpeechToCommand:
                 transcription = self.app.transcribe(audio_chunk, self.SAMPLE_RATE)
                 clean_text = transcription.translate(self.translator).lower()
 
-                print(clean_text)
+                #print(clean_text)
 
                 # Check commands; Only one command can activate at a time
-                for phrase, command in self.commands.items():
+                for phrase in phrase_to_key.keys():
                     if phrase in clean_text:
-                        command()
+                        print('Matched!:',phrase_to_key[phrase])
                         break
 
             # Keeps thread alive with 10ms delay for performance
@@ -221,3 +335,14 @@ class SpeechToCommand:
 
         if self.debugMode:
             print('STC online 🟢.')
+
+
+def main():
+    stc = SpeechToCommand()
+    stc.start()
+
+    while True:
+        time.sleep(0.0)
+
+if __name__ == "__main__":
+    main()
