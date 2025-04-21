@@ -29,7 +29,7 @@ from collections.abc import Callable    # Function type hinting
 import json                             # Loading in custom commands
 from jsonschema import validate, ValidationError
 
-import src.command.command_maker as cm
+import command_controller as cm
 
 '''
 Make a button that opens an overlay
