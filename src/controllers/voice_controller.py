@@ -180,7 +180,7 @@ class TextDisplayWidget(QWidget):
         painter.setFont(font)
 
         # Draw the text at the center of the widget
-        y_offset = self.height() - 30  # Start at the bottom of the widget
+        y_offset = self.height() - 20  # Start at the bottom of the widget
         for text in reversed(self.text_lines):  # Draw from the most recent to the oldest
             painter.drawText(10, y_offset, text)
             y_offset -= 20  # Adjust vertical spacing between lines
