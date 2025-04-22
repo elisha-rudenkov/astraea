@@ -1,12 +1,16 @@
-import sys
+import sys, os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QTextEdit, QWidget, QSlider,
                               QLabel, QFormLayout, QVBoxLayout, QPushButton, QHBoxLayout, 
                               QTabWidget, QStackedWidget, QGraphicsRectItem, QGraphicsScene,
                               QGraphicsView, QGraphicsTextItem, QGraphicsProxyWidget, QScrollArea, 
-                              QGroupBox, QHBoxLayout)
-from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase
+                              QGroupBox, QHBoxLayout, QFrame, QSizePolicy)
+from PyQt6.QtCore import Qt, QPoint, QSize
+from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase, QPixmap, QMouseEvent, QPalette
 from PyQt6 import QtCore, QtWidgets, QtGui
+
+import ctypes
+from ctypes import POINTER, c_bool, c_int, pointer, sizeof, WinDLL, Structure, c_void_p, cast
+from ctypes.wintypes import DWORD, HWND, RECT
 
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
@@ -19,10 +23,17 @@ class SliderProxyStyle(QtWidgets.QProxyStyle):
 
 # Custom graphics rectangle with specified dimensions and color
 class CustomGraphicsItem(QGraphicsRectItem):
-    def __init__(self, width, height, color):
+    def __init__(self, width, height, color, border_radius=10):
         super().__init__()
         self.setRect(0, 0, width, height)
-        self.setBrush(QColor(color))
+        self.color = QColor(color)
+        self.border_radius = border_radius
+        
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(self.color)
+        painter.setPen(Qt.PenStyle.NoPen)  # No border line
+        painter.drawRoundedRect(self.rect(), self.border_radius, self.border_radius)
 
 # Overlay window to display live transcription
 class OverlayWindow(QWidget):
@@ -64,6 +75,113 @@ class OverlayWindow(QWidget):
         painter.setFont(font)
         painter.drawText(10, 30, "Transcription line 1")
         painter.drawText(10, 60, "Transcription line 2")
+
+# Create a custom titlebar class
+class CustomTitleBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        
+        # Style the titlebar
+        self.setAutoFillBackground(True)
+        self.setBackgroundRole(QPalette.ColorRole.Window)
+        self.setMaximumHeight(40)
+        self.setStyleSheet("""
+            background-color: transparent;
+            color: white;
+        """)
+        
+        # Add logo on the left
+        self.logo = QLabel()
+        # Get the directory of the current file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # Construct the full path to the logo
+        logo_path = os.path.join(current_dir, 'logo.png')
+        self.logo = QLabel()
+        self.logo.setPixmap(QPixmap(logo_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.logo.setStyleSheet("margin-left: 10px; margin-right: 10px;")
+        self.layout.addWidget(self.logo)
+        
+        # Add title
+        self.title = QLabel("ASTREA")
+        self.title.setStyleSheet("font-size: 20px; color: #A099ED;")
+        font = QFont("Constantia")
+        self.title.setFont(font)
+        self.layout.addWidget(self.title)
+        
+        # Add spacer
+        self.layout.addStretch()
+        
+        # Add minimize button
+        self.min_button = QPushButton("─")
+        self.min_button.setFixedSize(40, 40)
+        self.min_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: white;
+                border: none;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #3D4F84;
+            }
+        """)
+        self.min_button.clicked.connect(self.show_minimized)
+        self.layout.addWidget(self.min_button)
+        
+        # Add maximize/restore button
+        self.max_button = QPushButton("□")
+        self.max_button.setFixedSize(40, 40)
+        self.max_button.setStyleSheet(self.min_button.styleSheet())
+        self.max_button.clicked.connect(self.toggle_maximize_restore)
+        self.layout.addWidget(self.max_button)
+        
+        # Add close button
+        self.close_button = QPushButton("×")
+        self.close_button.setFixedSize(40, 40)
+        self.close_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: white;
+                border: none;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #e81123;
+            }
+        """)
+        self.close_button.clicked.connect(self.close_window)
+        self.layout.addWidget(self.close_button)
+        
+        # For window dragging
+        self.mouse_pos = None
+        
+    def show_minimized(self):
+        self.parent.showMinimized()
+    
+    def toggle_maximize_restore(self):
+        if self.parent.isMaximized():
+            self.parent.showNormal()
+            self.max_button.setText("□")
+        else:
+            self.parent.showMaximized()
+            self.max_button.setText("❐")
+    
+    def close_window(self):
+        self.parent.close()
+    
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.mouse_pos = event.globalPosition().toPoint()
+    
+    def mouseMoveEvent(self, event):
+        if self.mouse_pos:
+            delta = event.globalPosition().toPoint() - self.mouse_pos
+            self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
+            self.mouse_pos = event.globalPosition().toPoint()
 
 # Main window for Astrea
 class MainWindow(QMainWindow):
@@ -140,28 +258,81 @@ class MainWindow(QMainWindow):
         self.calibrate_button.clicked.disconnect()
         self.calibrate_button.clicked.connect(callback)
     
-    def update_calibration_status(self, is_calibrated, values=None): # (Needs to be implemented)
-        """Update the calibration status display"""
-        # Implementation to update calibration status box
-        pass
+    def update_calibration_status(self, is_calibrated, values=None):
+        # Update the calibration status display
+        if is_calibrated:
+            self.calibration_status_label.setText("Calibrated")
+            self.calibration_status_label.setStyleSheet("""
+                background-color: #4CAF50; 
+                color: white;
+                border-radius: 10px;
+                border_radius=10
+                padding: 10px;
+                font-size: 16pt;
+                font-weight: bold;
+            """)
+        else:
+            self.calibration_status_label.setText("Not Calibrated")
+            self.calibration_status_label.setStyleSheet("""
+                background-color: #FFA500; 
+                color: white;
+                border-radius: 10px;
+                border_radius=10
+                padding: 10px;
+                font-size: 16pt;
+                font-weight: bold;
+            """)
     
     def init_ui(self):
         # Initialize the user interface components
         self.setWindowTitle('Astrea')
         self.setMinimumWidth(200)
-        
-        # Set background color
-        self.setStyleSheet("background-color: #E9F2FF;")
 
-        # Create central widget and main layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QFormLayout()
-        central_widget.setLayout(main_layout)
+        # Hide the default titlebar
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+
+        # Create a main container widget
+        container = QWidget()
+        container.setStyleSheet("background-color: #161833; border-radius: 10px;")
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+        
+        # Create and add custom titlebar
+        self.title_bar = CustomTitleBar(self)
+        container_layout.addWidget(self.title_bar)
+
+        # Create a widget to hold the menu bar
+        menu_widget = QWidget()
+        menu_widget.setStyleSheet("background-color: #161833;")
+        menu_layout = QVBoxLayout(menu_widget)
+        menu_layout.setContentsMargins(0, 0, 0, 0)
+        menu_layout.setSpacing(0)
+        
+        # Configure and add menu bar to the menu widget
+        self.setup_menu_bar()
+        menu_bar = self.menuBar()
+        menu_layout.addWidget(menu_bar)
+        
+        # Add the menu widget to the container
+        container_layout.addWidget(menu_widget)
+        
+        # Create central widget for content
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: #A0A7CC;")
         
         # Create stacked widget for multiple pages
         self.stacked_widget = QStackedWidget()
-        main_layout.addWidget(self.stacked_widget)
+        
+        # Create a layout for the content widget and add the stacked widget to it
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.addWidget(self.stacked_widget)
+
+        # Add the content widget to the container layout
+        container_layout.addWidget(content_widget)
+        
+        # Set the container as the central widget
+        self.setCentralWidget(container)
 
         # Create pages
         self.create_home_page()
@@ -172,9 +343,6 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.home_page)
         self.stacked_widget.addWidget(self.settings_page)
         self.stacked_widget.addWidget(self.help_page)
-
-        # Configure menu bar
-        self.setup_menu_bar()
 
         # Show the window
         self.showMaximized()
@@ -188,9 +356,10 @@ class MainWindow(QMainWindow):
         # Create graphics scene for visualization
         scene = QGraphicsScene()
         view = QGraphicsView(scene)
+        view.setFrameStyle(QtWidgets.QFrame.Shape.NoFrame)  # Removes the frame
 
         # Add video feed box
-        video_box = CustomGraphicsItem(750, 595, "#D9D9D9")
+        video_box = CustomGraphicsItem(750, 595, "#B6BEDF", border_radius=10)
         video_box.setPos(100, 100)
         scene.addItem(video_box)
 
@@ -256,7 +425,7 @@ class MainWindow(QMainWindow):
         scene.addItem(overlay_b_proxy)
 
         # Add head position monitoring box
-        head_pos_box = CustomGraphicsItem(500, 415, "#D9D9D9")
+        head_pos_box = CustomGraphicsItem(500, 600, "#B6BEDF", border_radius=10)
         head_pos_box.setPos(900, 0)
         scene.addItem(head_pos_box)
 
@@ -313,14 +482,39 @@ class MainWindow(QMainWindow):
         scene.addItem(line_6_text)
 
         # Add calibration status box
-        calib_box = CustomGraphicsItem(500, 200, "#D9D9D9")
-        calib_box.setPos(900, 425)
+        calib_box = CustomGraphicsItem(500, 150, "#B6BEDF", border_radius=10)
+        calib_box.setPos(900, 635)
         scene.addItem(calib_box)
 
-        # Add sensitivity status box
-        sens_box = CustomGraphicsItem(500, 150, "#D9D9D9")
-        sens_box.setPos(900, 635)
-        scene.addItem(sens_box)
+        # Add calibration status title
+        calib_title = QGraphicsTextItem("Calibration Status")
+        calib_title.setDefaultTextColor(Qt.GlobalColor.black)
+        calib_title.setFont(title_font)
+        
+        # Position the title at the top center of the calibration box
+        calib_title_x = calib_box.x() + (calib_box.rect().width() - calib_title.boundingRect().width()) / 2
+        calib_title_y = calib_box.y() + 10  # Margin from top of box
+        calib_title.setPos(calib_title_x, calib_title_y)
+        scene.addItem(calib_title)
+        
+        # Create calibration status label
+        self.calibration_status_label = QLabel("Not Calibrated")
+        self.calibration_status_label.setFont(QFont("Lucida Sans", 16, QFont.Weight.Bold))
+        self.calibration_status_label.setFixedSize(300, 60)
+        self.calibration_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.calibration_status_label.setStyleSheet("""
+            background-color: #FFA500;
+            color: white;
+            border-radius: 10px;
+            padding: 10px;
+        """)
+        
+        # Create a proxy widget for the status label
+        status_label_proxy = QGraphicsProxyWidget()
+        status_label_proxy.setWidget(self.calibration_status_label)
+        status_label_proxy.setPos(calib_box.x() + (calib_box.rect().width() - self.calibration_status_label.width()) / 2, 
+                                calib_box.y() + 70)  # Center horizontally, position below title
+        scene.addItem(status_label_proxy)
 
         home_layout.addRow(view)
     
@@ -346,7 +540,7 @@ class MainWindow(QMainWindow):
 
         # Create group box for cursor speed settings
         speed_group = QGroupBox("Cursor Speed Settings")
-        speed_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; padding-top: 15px; margin-top: 10px; }")
+        speed_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
         speed_layout = QVBoxLayout()
         speed_group.setLayout(speed_layout)
         content_layout.addWidget(speed_group)
@@ -377,7 +571,7 @@ class MainWindow(QMainWindow):
         
         # Create group box for vertical sensitivity settings
         vert_group = QGroupBox("Vertical Sensitivity Settings")
-        vert_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; padding-top: 15px; margin-top: 10px; }")
+        vert_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
         vert_layout = QVBoxLayout()
         vert_group.setLayout(vert_layout)
         content_layout.addWidget(vert_group)
@@ -400,7 +594,7 @@ class MainWindow(QMainWindow):
         
         # Create group box for threshold settings
         threshold_group = QGroupBox("Threshold Settings")
-        threshold_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; padding-top: 15px; margin-top: 10px; }")
+        threshold_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
         threshold_layout = QVBoxLayout()
         threshold_group.setLayout(threshold_layout)
         content_layout.addWidget(threshold_group)
@@ -532,7 +726,7 @@ class MainWindow(QMainWindow):
         # Create the left sidebar
         sidebar = QWidget()
         sidebar.setFixedWidth(250)
-        sidebar.setStyleSheet("background-color: #CFDAE9")
+        sidebar.setStyleSheet("background-color: #B6BEDF")
         sidebar_layout = QVBoxLayout()
         sidebar.setLayout(sidebar_layout)
 
@@ -578,7 +772,7 @@ class MainWindow(QMainWindow):
 
         # Create the right content area with a stacked widget
         self.help_content = QStackedWidget()
-        self.help_content.setStyleSheet("background-color: white;")
+        self.help_content.setStyleSheet("background-color: #A0A7CC;")
 
         # Create different topic pages
         self.create_getting_started_page()
@@ -678,7 +872,7 @@ class MainWindow(QMainWindow):
             step_layout = QHBoxLayout()
             step_widget.setLayout(step_layout)
             
-            # Create number circle
+            # Create step number circle
             number_label = QLabel(number)
             number_label.setFixedSize(50, 50)
             number_label.setStyleSheet("""
@@ -836,13 +1030,39 @@ class MainWindow(QMainWindow):
         else:
             self.overlay_window.show()
 
+    def no_cam_err_msg(self):
+        # Create a black pixmap
+        pixmap = QPixmap(700, 500)  # Match the video feed size
+        pixmap.fill(QColor(0, 0, 0))  # Black background
+
+        # Use painter to draw on the pixmap
+        painter = QPainter(pixmap)
+        painter.setPen(QColor(255, 0, 0))
+        painter.setFont(QFont('Arial', 20))
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "No camera detected")
+
+        painter.setFont(QFont('Arial', 16))
+        rect = pixmap.rect()
+        rect.translate(0, 40)  # Move down for second line
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "Please connect a camera and restart the app")
+        painter.end()
+
+        # Update the video label
+        if hasattr(self, 'scene_video_label'):
+            self.scene_video_label.setPixmap(pixmap)
+            
+        # Log the error
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Camera not detected or disconnected")
+
     def get_menu_bar_style(self):
         # Return CSS stylesheet for menu bar
         return """
             QMenuBar {
                 min-height: 50px;
                 font-size: 16pt;
-                background-color: #2F3F70;
+                background-color: #162552;
             }
             QMenuBar::item {
                 padding: 10px 20px;
@@ -861,7 +1081,7 @@ class MainWindow(QMainWindow):
         # Return CSS stylesheet for control buttons
         return """
             QPushButton {
-                background-color: #214CDA; /* Blue background */
+                background-color: #3A356F; /* Blue background */
                 color: white;              /* White text */
                 border-radius: 15px;       /* Rounded corners */
                 font-weight: bold;         /* Bold text */
@@ -871,10 +1091,10 @@ class MainWindow(QMainWindow):
                 padding: 8px;              /* Add some padding */
             }
             QPushButton:hover {
-                background-color: #3A62E0; /* Lighter blue when hovering */
+                background-color: #6661A1; /* Lighter blue when hovering */
             }
             QPushButton:pressed {
-                background-color: #1A3DB0; /* Darker blue when pressed */
+                background-color: #2E295E; /* Darker blue when pressed */
             }
         """
     
@@ -882,19 +1102,19 @@ class MainWindow(QMainWindow):
         # Return CSS stylesheet for slider control
         return """
             QSlider::handle:horizontal {
-                background:rgb(33, 76, 218);
+                background: #FCD88B;
                 width: 85px;
                 height: 80px;
                 margin: -30px 0px;
                 border-radius: 40px;
             }
             QSlider::add-page:horizontal {
-                background: #d3d3d3;            /* Color for the right side of the handle */
+                background: #B6BEDF;            /* Color for the right side of the handle */
                 border-radius: 10px;
                 height: 10px;
             }
             QSlider::sub-page:horizontal {
-                background: #9dc5fa;            /* Color for the left side of the handle */
+                background: #EDCB80;            /* Color for the left side of the handle */
                 border-radius: 10px;
                 height: 10px;
             }
@@ -904,7 +1124,7 @@ class MainWindow(QMainWindow):
                 border-radius: 10px;            /* Rounded corners for the track */
             }
         """
-    
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
