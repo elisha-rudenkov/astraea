@@ -59,13 +59,13 @@ def main():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         logger.error("Cannot open camera")
-        return
     logger.info("Camera initialized")
 
     # Initialize state variables
     last_analysis_result = None
     calibrated = False
     calibration_text = "Press 'C' when ready to calibrate"
+    cam_error_shown = False
 
     # Initialize UI
     app = QApplication(sys.argv)
@@ -88,68 +88,73 @@ def main():
     window.register_calibrate_callback(calibrate)
 
     def update_frame():
-        nonlocal last_analysis_result, calibration_text
+        nonlocal last_analysis_result, calibration_text, cam_error_shown
 
-        ret, frame = cap.read()
-        if not ret:
-            logger.error("Failed to grab frame")
+        if not cap.isOpened():
+            if not cam_error_shown:
+                window.no_cam_err_msg()
+                cam_error_shown = True
             return
-        
-        # Check if spacebar is pressed using the keyboard module
-        mouse_controller.movement_paused = keyboard.is_pressed('space')
-        
-        # Detect faces in the frame
-        detections = face_detector.detect_faces(frame)
-        
-        if detections:
-            detection = max(detections, key=lambda x: x[4])
-            face_roi = extract_face_roi(frame, detection)
+        else:
+            if cam_error_shown:
+                cam_error_shown = False
+
+            ret, frame = cap.read()
+            if not ret:
+                logger.error("Failed to grab frame")
+                return
             
-            if face_roi.size > 0:
-                analysis_result = landmark_analyzer.analyze_face(face_roi)
+            # Check if spacebar is pressed using the keyboard module
+            mouse_controller.movement_paused = keyboard.is_pressed('space')
+            
+            # Detect faces in the frame
+            detections = face_detector.detect_faces(frame)
+            
+            if detections:
+                detection = max(detections, key=lambda x: x[4])
+                face_roi = extract_face_roi(frame, detection)
                 
-                if analysis_result is not None:
-                    # Store latest analysis result
-                    last_analysis_result = analysis_result
-
-                    # Draw rectangle around face
-                    x, y, w, h = detection[:4]
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                if face_roi.size > 0:
+                    analysis_result = landmark_analyzer.analyze_face(face_roi)
                     
-                    # Check for calibration key press
-                    key = cv2.waitKey(1) & 0xFF  
-                    if key == ord('c'):
-                        calibrate()
+                    if analysis_result is not None:
+                        # Store latest analysis result
+                        last_analysis_result = analysis_result
 
-                    # Update mouse position if calibrated
-                    if calibrated:
-                        mouse_controller.update(analysis_result)
-                    try:
-                        pitch = analysis_result['pitch']
-                        yaw = analysis_result['yaw']
-                        roll = analysis_result['roll']
+                        # Draw rectangle around face
+                        x, y, w, h = detection[:4]
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                         
-                        # Display information on frame
-                        cv2.putText(frame, calibration_text, (10, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 60),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 80),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        
-                        # Display pause status
-                        if mouse_controller.movement_paused:
-                            cv2.putText(frame, "MOVEMENT PAUSED", (10, 130),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        # Check for calibration key press
+                        key = cv2.waitKey(1) & 0xFF  
+                        if key == ord('c'):
+                            calibrate()
+
+                        # Update mouse position if calibrated
+                        if calibrated:
+                            mouse_controller.update(analysis_result)
+                        try:
+                            pitch = analysis_result['pitch']
+                            yaw = analysis_result['yaw']
+                            roll = analysis_result['roll']
                             
-                        # Update UI with head position data
-                        # (Needs to be implemented in settings file)
-                        window.update_head_position_display(pitch,yaw,roll)
+                            # Display information on frame
+                            cv2.putText(frame, calibration_text, (10, 30),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                            cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 60),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 80),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            
+                            # Display pause status
+                            if mouse_controller.movement_paused:
+                                cv2.putText(frame, "MOVEMENT PAUSED", (10, 130),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-                    except Exception as e:
-                        logger.error(f"Error displaying results: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"Error displaying results: {str(e)}")
 
             # Convert frame to RGB for Qt
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
