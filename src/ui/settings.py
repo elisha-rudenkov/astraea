@@ -280,6 +280,12 @@ class MainWindow(QMainWindow):
         line_6_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 200)
         scene.addItem(line_6_text)
 
+        line_7_text = QGraphicsTextItem("- Say \"create command\" to open the command creator")
+        line_7_text.setDefaultTextColor(Qt.GlobalColor.black)
+        line_7_text.setFont(text_font)
+        line_7_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 230)
+        scene.addItem(line_7_text)
+
         # Add calibration status box
         calib_box = CustomGraphicsItem(500, 200, "#D9D9D9")
         calib_box.setPos(900, 425)

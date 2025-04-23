@@ -107,7 +107,7 @@ class SpeechToCommand:
         # Callbacks for recalibrating
         self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
 
-        self.commands['create command'] = lambda : self.__speechMakeCommand()
+        self.commands['create command'] = lambda : self.__perform_if_active(self.__speechMakeCommand)
 
         '''
         Commands are stored in JSON with the format:

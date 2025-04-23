@@ -31,7 +31,7 @@ class CommandMaker(QWidget):
             border: 3px solid #43459a;
             font-weight: bold;
         """)
-        self.header_label.setFont(QFont("Arial", 16))
+        self.header_label.setFont(QFont("Segoe UI", 16))
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -45,10 +45,10 @@ class CommandMaker(QWidget):
 
         # Left info area
         self.left_label = QLabel("Loading data...", self)
-        self.right_label = QLabel("Additional info", self)
+        self.right_label = QLabel("...", self)
 
         for label in [self.left_label, self.right_label]:
-            label.setFont(QFont("Arial", 14))
+            label.setFont(QFont("Segoe UI", 14))
             label.setStyleSheet("""
                 color: white;
                 background-color: rgba(22,23,51,240);
@@ -57,7 +57,7 @@ class CommandMaker(QWidget):
                 padding: 10px 5px 0px 5px;
             """)
 
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             label.setAlignment(Qt.AlignmentFlag.AlignLeft)
             label.setWordWrap(True)
 
