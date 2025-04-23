@@ -3,14 +3,10 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QTextEdit, QWi
                               QLabel, QFormLayout, QVBoxLayout, QPushButton, QHBoxLayout, 
                               QTabWidget, QStackedWidget, QGraphicsRectItem, QGraphicsScene,
                               QGraphicsView, QGraphicsTextItem, QGraphicsProxyWidget, QScrollArea, 
-                              QGroupBox, QHBoxLayout, QFrame, QSizePolicy)
+                              QGroupBox, QHBoxLayout, QFrame, QSizePolicy, QGraphicsEllipseItem)
 from PyQt6.QtCore import Qt, QPoint, QSize
 from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase, QPixmap, QMouseEvent, QPalette
 from PyQt6 import QtCore, QtWidgets, QtGui
-
-import ctypes
-from ctypes import POINTER, c_bool, c_int, pointer, sizeof, WinDLL, Structure, c_void_p, cast
-from ctypes.wintypes import DWORD, HWND, RECT
 
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
@@ -23,16 +19,21 @@ class SliderProxyStyle(QtWidgets.QProxyStyle):
 
 # Custom graphics rectangle with specified dimensions and color
 class CustomGraphicsItem(QGraphicsRectItem):
-    def __init__(self, width, height, color, border_radius=10):
+    def __init__(self, width, height, color, border_radius=10, border_color="#C5CFF4", border_width=2):
         super().__init__()
         self.setRect(0, 0, width, height)
         self.color = QColor(color)
         self.border_radius = border_radius
+        self.border_color = QColor(border_color)
+        self.border_width = border_width
         
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(self.color)
-        painter.setPen(Qt.PenStyle.NoPen)  # No border line
+        
+        # Set the pen for the border (instead of NoPen)
+        painter.setPen(QPen(self.border_color, self.border_width))
+        
         painter.drawRoundedRect(self.rect(), self.border_radius, self.border_radius)
 
 # Overlay window to display live transcription
@@ -290,10 +291,11 @@ class MainWindow(QMainWindow):
 
         # Hide the default titlebar
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         # Create a main container widget
         container = QWidget()
-        container.setStyleSheet("background-color: #161833; border-radius: 10px;")
+        container.setStyleSheet("background-color: #090A19;")
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(0)
@@ -301,6 +303,14 @@ class MainWindow(QMainWindow):
         # Create and add custom titlebar
         self.title_bar = CustomTitleBar(self)
         container_layout.addWidget(self.title_bar)
+        
+        # Create the separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setLineWidth(10)
+        separator.setStyleSheet("background-color:#3D4F84;")
+        container_layout.addWidget(separator)
 
         # Create a widget to hold the menu bar
         menu_widget = QWidget()
@@ -365,7 +375,7 @@ class MainWindow(QMainWindow):
 
         # Create a QLabel for the video feed in the scene
         self.scene_video_label = QLabel()
-        self.scene_video_label.setFixedSize(700, 500)  # Slightly smaller than the video_box
+        self.scene_video_label.setFixedSize(700, 500)
         self.scene_video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scene_video_label.setStyleSheet("background-color: transparent;")
         
@@ -373,22 +383,26 @@ class MainWindow(QMainWindow):
         proxy = QGraphicsProxyWidget()
         proxy.setWidget(self.scene_video_label)
         
-        # Position the video label inside the video box (with some margin)
+        # Position the video label inside the video box
         proxy.setPos(video_box.pos() + QtCore.QPointF(25, 50))
         scene.addItem(proxy)
 
         # Add video feed label
         video_label = QGraphicsTextItem("Video Feed")
         video_label.setDefaultTextColor(Qt.GlobalColor.black)
+        video_label_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
+        video_label.setFont(video_label_font)
 
-        font = QFont("Lucida Sans", 16)
-        video_label.setFont(font)
+        cmd_title = QGraphicsTextItem("Voice Commands")
+        cmd_title.setDefaultTextColor(Qt.GlobalColor.black)
+        cmd_title_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
+        cmd_title.setFont(cmd_title_font)
 
         # Position the label at the top center of the video feed box
         label_x = video_box.x() + (video_box.rect().width() - video_label.boundingRect().width()) / 2
-        label_y = video_box.y() + 10 # Margin from top of box
+        label_y = video_box.y() + 10
         video_label.setPos(label_x, label_y)
-        scene.addItem(video_label) # Add label to the scene
+        scene.addItem(video_label)
 
         # Create calibration button
         self.calibrate_button = QPushButton("Calibrate")
@@ -424,62 +438,48 @@ class MainWindow(QMainWindow):
 
         scene.addItem(overlay_b_proxy)
 
-        # Add head position monitoring box
-        head_pos_box = CustomGraphicsItem(500, 600, "#B6BEDF", border_radius=10)
-        head_pos_box.setPos(900, 0)
-        scene.addItem(head_pos_box)
+        # Add voice commands box
+        voice_cmd_box = CustomGraphicsItem(500, 600, "#B6BEDF", border_radius=10)
+        voice_cmd_box.setPos(900, 0)
+        scene.addItem(voice_cmd_box)
+        
+        # Add label to voice commands box
+        cmd_title = QGraphicsTextItem("Voice Commands")
+        cmd_title.setDefaultTextColor(Qt.GlobalColor.black)
+        cmd_title_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
+        cmd_title.setFont(cmd_title_font)
 
-        # Add label to head position box
-        help_title = QGraphicsTextItem("Voice Commands")
-        help_title.setDefaultTextColor(Qt.GlobalColor.black)
-        title_font = help_title.font()
-        title_font = QFont("Fira Sans", 16)
-        help_title.setFont(title_font)
+        # Position the title at the top center of the box
+        cmd_title_x = voice_cmd_box.x() + (voice_cmd_box.rect().width() - cmd_title.boundingRect().width()) / 2
+        cmd_title_y = voice_cmd_box.y() + 15
+        cmd_title.setPos(cmd_title_x, cmd_title_y)
+        scene.addItem(cmd_title)
 
-        # Position the title at the top center of the head position box
-        title_x = head_pos_box.x() + (head_pos_box.rect().width() - help_title.boundingRect().width()) / 2
-        title_y = head_pos_box.y() + 10  # Margin from top of box
-        help_title.setPos(title_x, title_y)
-        scene.addItem(help_title)
+        # List of voice commands
+        commands = [
+            "🗣️  \"Start listening\" – Activate voice commands",
+            "🔇  \"Stop listening\" – Deactivate voice commands",
+            "➡️  \"Right\" – Right click",
+            "⬅️  \"Left\" – Left click",
+            "✋  \"Hold\" – Hold down left click",
+            "🖱️  \"Release\" – Release held click",
+            "🎯  \"Calibrate\" – Calibrate the cursor",
+            "⏸️  \"Pause mouse\" – Freeze cursor movement",
+            "▶️  \"Resume mouse\" – Unfreeze cursor movement"
+        ]
 
-        # Add text to the head position box
-        line_1_text = QGraphicsTextItem("- Say \"start listening\" to activate voice commands")
-        line_1_text.setDefaultTextColor(Qt.GlobalColor.black)
-        text_font = line_1_text.font()
-        text_font = QFont("Fira Sans", 14)
-        line_1_text.setFont(text_font)
-        line_1_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 50)
-        scene.addItem(line_1_text)
+        start_x = voice_cmd_box.x() + 30
+        start_y = voice_cmd_box.y() + 60
+        line_spacing = 40
 
-        line_2_text = QGraphicsTextItem("- Say \"stop listening\" to deactivate voice commands")
-        line_2_text.setDefaultTextColor(Qt.GlobalColor.black)
-        line_2_text.setFont(text_font)
-        line_2_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 80)
-        scene.addItem(line_2_text)
+        command_font = QFont("Segoe UI", 14)
 
-        line_3_text = QGraphicsTextItem("- Say \"right\" to right click")
-        line_3_text.setDefaultTextColor(Qt.GlobalColor.black)
-        line_3_text.setFont(text_font)
-        line_3_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 110)
-        scene.addItem(line_3_text)
-
-        line_4_text = QGraphicsTextItem("- Say \"left\" to left click")
-        line_4_text.setDefaultTextColor(Qt.GlobalColor.black)
-        line_4_text.setFont(text_font)
-        line_4_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 140)
-        scene.addItem(line_4_text)
-
-        line_5_text = QGraphicsTextItem("- Say \"hold\" to hold down left click")
-        line_5_text.setDefaultTextColor(Qt.GlobalColor.black)
-        line_5_text.setFont(text_font)
-        line_5_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 170)
-        scene.addItem(line_5_text)
-
-        line_6_text = QGraphicsTextItem("- Say \"release\" to release after holding down click")
-        line_6_text.setDefaultTextColor(Qt.GlobalColor.black)
-        line_6_text.setFont(text_font)
-        line_6_text.setPos(head_pos_box.x() + 20, head_pos_box.y() + 200)
-        scene.addItem(line_6_text)
+        for i, command in enumerate(commands):
+            cmd_item = QGraphicsTextItem(command)
+            cmd_item.setDefaultTextColor(Qt.GlobalColor.black)
+            cmd_item.setFont(command_font)
+            cmd_item.setPos(start_x, start_y + i * line_spacing)
+            scene.addItem(cmd_item)
 
         # Add calibration status box
         calib_box = CustomGraphicsItem(500, 150, "#B6BEDF", border_radius=10)
@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
         # Add calibration status title
         calib_title = QGraphicsTextItem("Calibration Status")
         calib_title.setDefaultTextColor(Qt.GlobalColor.black)
-        calib_title.setFont(title_font)
+        calib_title.setFont(cmd_title_font)
         
         # Position the title at the top center of the calibration box
         calib_title_x = calib_box.x() + (calib_box.rect().width() - calib_title.boundingRect().width()) / 2
@@ -513,7 +513,7 @@ class MainWindow(QMainWindow):
         status_label_proxy = QGraphicsProxyWidget()
         status_label_proxy.setWidget(self.calibration_status_label)
         status_label_proxy.setPos(calib_box.x() + (calib_box.rect().width() - self.calibration_status_label.width()) / 2, 
-                                calib_box.y() + 70)  # Center horizontally, position below title
+                                calib_box.y() + 70)
         scene.addItem(status_label_proxy)
 
         home_layout.addRow(view)
@@ -540,7 +540,7 @@ class MainWindow(QMainWindow):
 
         # Create group box for cursor speed settings
         speed_group = QGroupBox("Cursor Speed Settings")
-        speed_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
+        speed_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
         speed_layout = QVBoxLayout()
         speed_group.setLayout(speed_layout)
         content_layout.addWidget(speed_group)
@@ -571,7 +571,7 @@ class MainWindow(QMainWindow):
         
         # Create group box for vertical sensitivity settings
         vert_group = QGroupBox("Vertical Sensitivity Settings")
-        vert_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
+        vert_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
         vert_layout = QVBoxLayout()
         vert_group.setLayout(vert_layout)
         content_layout.addWidget(vert_group)
@@ -594,7 +594,7 @@ class MainWindow(QMainWindow):
         
         # Create group box for threshold settings
         threshold_group = QGroupBox("Threshold Settings")
-        threshold_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; border: 2px solid #878FB9; padding-top: 15px; margin-top: 10px; }")
+        threshold_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
         threshold_layout = QVBoxLayout()
         threshold_group.setLayout(threshold_layout)
         content_layout.addWidget(threshold_group)
@@ -720,70 +720,102 @@ class MainWindow(QMainWindow):
     def create_help_page(self):
         # Create the help page and add components
         self.help_page = QWidget()
-        help_layout = QHBoxLayout()
+        help_layout = QVBoxLayout()
         self.help_page.setLayout(help_layout)
         
-        # Create the left sidebar
-        sidebar = QWidget()
-        sidebar.setFixedWidth(250)
-        sidebar.setStyleSheet("background-color: #B6BEDF")
-        sidebar_layout = QVBoxLayout()
-        sidebar.setLayout(sidebar_layout)
-
-        # Create the sidebar buttons
-        help_topics = [
-            "Getting Started",
-            "Calibration Guide",
-            "Troubleshooting",
-            "FAQ",
-            "Contact Us"
-        ]
-
-        self.topic_buttons = []
-        for topic in help_topics:
-            button = QPushButton(topic)
-            button.setStyleSheet("""
-                QPushButton {
-                    text-align: left;
-                    padding: 15px;
-                    font-size: 16px;
-                    border: none;
-                    background-color: #CFDAE9;
-                }
-                QPushButton:hover {
-                background-color: #B4C3D7;
-                }
-                QPushButton:pressed {
-                    background-color: #0288D1;
-                }
-            """)
-
-            # Connect button clicks to the change_help_content function
-            button.clicked.connect(lambda checked, t=topic: self.change_help_content(t))
-            sidebar_layout.addWidget(button)
-            self.topic_buttons.append(button)
-
-        # Highlight the first button (Getting Started) by default
-        self.topic_buttons[0].setStyleSheet(self.topic_buttons[0].styleSheet() +
-                                            "QPushButton { background-color: #0288D1; color: white; }")
+        # Create title label centered at the top
+        title = QLabel("Getting Started")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("font-size: 40px; font-weight: bold; margin: 20px 0 40px 0; color: #162552;")
+        help_layout.addWidget(title)
         
-        # Add stretch to push buttons to the top
-        sidebar_layout.addStretch()
+        # Create container for the boxes
+        boxes_container = QWidget()
+        boxes_layout = QHBoxLayout()
+        boxes_container.setLayout(boxes_layout)
+        
+        # Define the steps content
+        steps = [
+            ("1", "Position yourself in front of the camera", "#6661A1"),
+            ("2", "Press calibration button or say \"calibrate\" to calibrate", "#3D4F84"),
+            ("3", "Move your head to control the cursor", "#3A356F"),
+            ("4", "Use voice commands for clicking and other functions", "#162552")
+        ]
+        
+        # Create each step box
+        for number, text, color in steps:
+            # Create the box widget
+            box = QWidget()
+            box.setFixedWidth(300)
+            box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            box.setStyleSheet(f"""
+                background-color: #B6BEDF;
+                border-radius: 15px;
+                padding: 20px 15px;
+                min-height: 150px;
+                border: 2px solid #C5CFF4;
+            """)
+            
+            box_layout = QVBoxLayout()
+            box_layout.setContentsMargins(15, 15, 15, 15)
+            box_layout.setSpacing(15)
+            box.setLayout(box_layout)
+            
+            number_view = QGraphicsView()
+            number_view.setFixedSize(100, 100)
+            number_view.setStyleSheet("background: transparent; border: none;")
+            number_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+            number_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            number_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            number_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Create the right content area with a stacked widget
-        self.help_content = QStackedWidget()
-        self.help_content.setStyleSheet("background-color: #A0A7CC;")
+            # Create the scene
+            number_scene = QGraphicsScene()
+            number_scene.setSceneRect(-40, -40, 80, 80)
+            number_view.setScene(number_scene)
 
-        # Create different topic pages
-        self.create_getting_started_page()
-        self.create_calibration_guide_page()
-        self.create_troubleshooting_page()
-        self.create_faq_page()
-        self.create_contact_page()
+            # Create the circle centered in the scene
+            circle = QGraphicsEllipseItem(-30, -30, 60, 60)
+            circle.setBrush(QColor(color))
+            circle.setPen(QPen(Qt.PenStyle.NoPen))
+            number_scene.addItem(circle)
 
-        # Add left sidebar and right content to main layout
-        help_layout.addWidget(sidebar)
-        help_layout.addWidget(self.help_content, 1) # stretch factor 1
+            # Add number text
+            text_item = QGraphicsTextItem(number)
+            text_item.setDefaultTextColor(QColor(255, 255, 255))
+            text_item.setFont(QFont("Lucida Sans", 24, QFont.Weight.Bold))
+
+            # Position the text in the center of the circle
+            text_rect = text_item.boundingRect()
+            text_x = -text_rect.width() / 2
+            text_y = -text_rect.height() / 2
+            text_item.setPos(text_x, text_y)
+
+            number_scene.addItem(text_item)
+            box_layout.addWidget(number_view, 0, Qt.AlignmentFlag.AlignCenter)
+            
+            # Create step text
+            text_label = QLabel(text)
+            text_label.setWordWrap(True)
+            text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            text_label.setStyleSheet("font-size: 20px; margin-top: 15px; color: #000000; line-height: 1.4;")
+            text_label.setFont(QFont("Fira Sans"))
+            box_layout.addWidget(text_label)
+            
+            # Add spacer at the bottom to push content up
+            box_layout.addStretch()
+            
+            # Add box to container with some margin
+            boxes_layout.addWidget(box)
+            if number != "4":  # Don't add spacing after the last box
+                boxes_layout.addSpacing(20)
+        
+        # Add the boxes container to the main layout
+        boxes_container.setStyleSheet("margin-top: 30px;")
+        help_layout.addWidget(boxes_container)
+        
+        # Add stretch to push everything to the top and center
+        help_layout.addStretch()
 
     def change_help_content(self, topic):
         # Change content based on selected topic and update button styles
@@ -813,169 +845,11 @@ class MainWindow(QMainWindow):
         # Set the selected page
         if topic == "Getting Started":
             self.help_content.setCurrentIndex(0)
-        elif topic == "Calibration Guide":
-            self.help_content.setCurrentIndex(1)
-        elif topic == "Troubleshooting":
-            self.help_content.setCurrentIndex(2)
-        elif topic == "FAQ":
-            self.help_content.setCurrentIndex(3)
-        elif topic == "Contact Us":
-            self.help_content.setCurrentIndex(4)
 
     def create_getting_started_page(self):
         # Create the Getting Started page content
-        getting_started = QWidget()
-        layout = QVBoxLayout()
-        getting_started.setLayout(layout)
-        
-        # Add title
-        title = QLabel("Getting Started with Astrea")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 20px;")
-        layout.addWidget(title)
-        
-        # Add video placeholder
-        video_placeholder = QWidget()
-        video_placeholder.setStyleSheet("background-color: #D9D9D9; min-height: 300px;")
-        video_layout = QVBoxLayout()
-        video_placeholder.setLayout(video_layout)
-
-        # Add play button in the center of the video placeholder
-        play_button = QPushButton("▶")
-        play_button.setFixedSize(100, 100)
-        play_button.setStyleSheet("""
-            QPushButton {
-                background-color: #A7C8F0;
-                border-radius: 50px;
-                color: white;
-                font-size: 40px;
-            }
-        """)
-        
-        video_layout.addWidget(play_button, 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(video_placeholder)
-        
-        # Add Quick Start Guide
-        guide_title = QLabel("Quick Start Guide")
-        guide_title.setStyleSheet("font-size: 20px; font-weight: bold; margin-top: 20px; margin-bottom: 10px;")
-        layout.addWidget(guide_title)
-        
-        # Create steps
-        steps = [
-            ("1", "Position yourself in front of the camera"),
-            ("2", "Press calibration button or say \"calibrate\" to calibrate"),
-            ("3", "Move your head to control the cursor"),
-            ("4", "Tilt head to click (left for left click, right for right click)")
-        ]
-        
-        for number, text in steps:
-            step_widget = QWidget()
-            step_layout = QHBoxLayout()
-            step_widget.setLayout(step_layout)
-            
-            # Create step number circle
-            number_label = QLabel(number)
-            number_label.setFixedSize(50, 50)
-            number_label.setStyleSheet("""
-                background-color: #0085CA;
-                color: white;
-                font-size: 22px;
-                font-weight: bold;
-                border-radius: 25px;
-                qproperty-alignment: AlignCenter;
-            """)
-            
-            # Create step text
-            text_label = QLabel(text)
-            text_label.setStyleSheet("font-size: 16px; margin-left: 10px;")
-            
-            step_layout.addWidget(number_label)
-            step_layout.addWidget(text_label, 1)
-            step_layout.addStretch()
-            
-            layout.addWidget(step_widget)
-        
-        # Add stretch to push everything to the top
-        layout.addStretch()
-        
-        # Add to stacked widget
-        self.help_content.addWidget(getting_started)
-
-    def create_calibration_guide_page(self):
-        # Create the Calibration Guide page content
-        calibration_guide = QWidget()
-        layout = QVBoxLayout()
-        calibration_guide.setLayout(layout)
-        
-        title = QLabel("Calibration Guide")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
-        
-        content = QLabel("Calibration instructions will go here...")
-        layout.addWidget(content)
-        
-        # Add stretch
-        layout.addStretch()
-        
-        # Add to stacked widget
-        self.help_content.addWidget(calibration_guide)
-
-    def create_troubleshooting_page(self):
-        # Create the Troubleshooting page content
-        troubleshooting = QWidget()
-        layout = QVBoxLayout()
-        troubleshooting.setLayout(layout)
-        
-        title = QLabel("Troubleshooting")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
-        
-        content = QLabel("Troubleshooting tips will go here...")
-        layout.addWidget(content)
-        
-        # Add stretch
-        layout.addStretch()
-        
-        # Add to stacked widget
-        self.help_content.addWidget(troubleshooting)
-
-    def create_faq_page(self):
-        # Create the FAQ page content
-        faq = QWidget()
-        layout = QVBoxLayout()
-        faq.setLayout(layout)
-        
-        title = QLabel("Frequently Asked Questions")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
-        
-        content = QLabel("FAQs will go here...")
-        layout.addWidget(content)
-        
-        # Add stretch
-        layout.addStretch()
-        
-        # Add to stacked widget
-        self.help_content.addWidget(faq)
-
-    def create_contact_page(self):
-        # Create the Contact Us page content
-        contact = QWidget()
-        layout = QVBoxLayout()
-        contact.setLayout(layout)
-        
-        title = QLabel("Contact Us")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
-        
-        content = QLabel("Contact information will go here...")
-        layout.addWidget(content)
-        
-        # Add stretch
-        layout.addStretch()
-        
-        # Add to stacked widget
-        self.help_content.addWidget(contact)
-
+        pass
+    
     def setup_menu_bar(self):
         # Configure menu bar with navigation actions
         menu_bar = self.menuBar()
@@ -1032,8 +906,8 @@ class MainWindow(QMainWindow):
 
     def no_cam_err_msg(self):
         # Create a black pixmap
-        pixmap = QPixmap(700, 500)  # Match the video feed size
-        pixmap.fill(QColor(0, 0, 0))  # Black background
+        pixmap = QPixmap(700, 500)
+        pixmap.fill(QColor(0, 0, 0))
 
         # Use painter to draw on the pixmap
         painter = QPainter(pixmap)
@@ -1060,7 +934,7 @@ class MainWindow(QMainWindow):
         # Return CSS stylesheet for menu bar
         return """
             QMenuBar {
-                min-height: 50px;
+                min-height: 30px;
                 font-size: 16pt;
                 background-color: #162552;
             }
