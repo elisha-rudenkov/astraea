@@ -1,17 +1,20 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QVBoxLayout, QFrame, QSizePolicy
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QGuiApplication
+from PyQt6.QtGui import QFont, QGuiApplication, QPainter, QColor, QPen
 
-class InfoOverlay(QWidget):
+class CommandMaker(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setWindowFlags(
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.Tool |
-            Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.WindowStaysOnTopHint | # Always on top of other window
+            Qt.WindowType.FramelessWindowHint |  # Removes window frame
+            Qt.WindowType.Tool |                 # Window not shown on taskbar
+            Qt.WindowType.BypassWindowManagerHint # Don't let window manager handle this window
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self.text_lines = []
 
         self.init_ui()
 
@@ -42,31 +45,23 @@ class InfoOverlay(QWidget):
 
         # Left info area
         self.left_label = QLabel("Loading data...", self)
-        self.left_label.setStyleSheet("""
-            color: white;
-            background-color: rgba(22,23,51,240);
-            padding: 30px 40px;
-            border-radius: 12px;
-            border: 3px solid #43459a;
-        """)
-        self.left_label.setFont(QFont("Arial", 14))
-        self.left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Right info area
         self.right_label = QLabel("Additional info", self)
-        self.right_label.setStyleSheet("""
-            color: white;
-            background-color: rgba(22,23,51,240);
-            padding: 30px 40px;
-            border-radius: 12px;
-            border: 3px solid #43459a;
-        """)
-        self.right_label.setFont(QFont("Arial", 14))
-        self.right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Add to the horizontal layout
-        content_layout.addWidget(self.left_label)
-        content_layout.addWidget(self.right_label)
+        for label in [self.left_label, self.right_label]:
+            label.setFont(QFont("Arial", 14))
+            label.setStyleSheet("""
+                color: white;
+                background-color: rgba(22,23,51,240);
+                border-radius: 12px;
+                border: 3px solid #43459a;
+                padding: 10px 5px 0px 5px;
+            """)
+
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+            label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            label.setWordWrap(True)
+
+            content_layout.addWidget(label, 1)
 
         # Assemble final layout
         master_layout.addWidget(self.header_label)
@@ -74,8 +69,14 @@ class InfoOverlay(QWidget):
 
         self.setLayout(master_layout)
 
+    
 
-    def show_overlay(self):
+    def show_overlay(self, isActivated : bool):
+
+        if not isActivated:
+            self.hide_overlay()
+            return
+
         screen = QGuiApplication.primaryScreen()
         geometry = screen.geometry()
 
@@ -106,6 +107,16 @@ class InfoOverlay(QWidget):
         self.header_label.setFont(font)
         
 
-
     def hide_overlay(self):
         self.hide()
+
+    
+    def update_walkthrough(self, info):
+        self.left_label.setText(str(info))
+    
+    def update_answers(self, info):
+        self.text_lines.append(str(info))
+
+        new_text = '\n'.join(self.text_lines)
+
+        self.right_label.setText(new_text)

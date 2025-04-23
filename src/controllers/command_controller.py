@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from collections.abc import Callable    # Function type hinting
 
 control_map = {
     "confirm": "confirm",
@@ -140,7 +141,11 @@ CMSTATE = CommandMakerState
 
 class CommandMaker:
 
-    def __init__(self):
+    def __init__(self, command_questions : Callable, command_answers : Callable):
+        
+        self.command_questions = command_questions
+        self.command_answers = command_answers
+        
         self.state : CommandMakerState = CommandMakerState.IDLE
         
         self.phrase : str = None
@@ -156,7 +161,29 @@ class CommandMaker:
 
     def __switchToState(self, to : CommandMakerState):
         self.state = to
-        print(f"[🔄] State: {to}")
+
+        match to:
+            case CMSTATE.ASK_WORD_COUNT:
+                self.command_questions("How many words in your command?" \
+                "\n\nSay 'number' followed a digit (1-9)." \
+                "\n\ne.g. 'number 2', 'number 3'")
+            case CMSTATE.ASK_PHRASE:
+                self.command_questions("What will your activation phrase be?" \
+                "\n\nSay 'say' followed by your phrase." \
+                "\n\ne.g., 'say select all', 'say copy'")
+            case CMSTATE.ASK_ACTIVATION:
+                self.command_questions("Does this command require Astrea to be listening?" \
+                "\n\nSay 'yes' or 'no'" \
+                "\n\nIf you say 'yes', Astrea needs to hear 'start listening' before the command is used")
+            case CMSTATE.ASK_TYPE:
+                self.command_questions("Is this a shortcut or macro?" \
+                "\n\nSay 'shortcut' or 'macro'" \
+                "\n\nShortcuts are triggered together, macros are executed sequentially")
+            case CMSTATE.KEY_INPUT_LOOP:
+                self.command_questions("Say the name of the key to add" \
+                "\n\ne.g. 'enter', 'control', 'letter a', 'number 9'")
+            case CMSTATE.DONE:
+                self.command_questions("⚙️ Finalizing...")
     
     def __clearCommandMaker(self):
         self.phrase = None
@@ -172,7 +199,6 @@ class CommandMaker:
     def makerHandler(self, clean_text : str) -> dict:
 
         if self.state == CMSTATE.IDLE:
-            print('[🧙 Wizard] Starting new command creation.')
             self.__switchToState(CMSTATE.ASK_WORD_COUNT)
 
         if self.state == CMSTATE.ASK_WORD_COUNT:
@@ -180,44 +206,55 @@ class CommandMaker:
             for phrase, key in number_map.items():
                 if phrase in clean_text:
                     self.phraseLength = int(key)
-                    print('📝 Word count set to', key)
-                    self.__switchToState(CMSTATE.ASK_PHRASE)
-                    break
+
+                    if 1 <= self.phraseLength <= 9:
+                        self.command_answers('📝 Word count set to ' + key)
+                        self.__switchToState(CMSTATE.ASK_PHRASE)
+                        break
                     
         elif self.state == CMSTATE.ASK_PHRASE:
             
             # 'Say' is the delimiter
             if 'say' in clean_text:
-                self.phrase = ' '.join(clean_text.split(' ')[1:self.phraseLength + 1])
-                print('🗣️  You said:', self.phrase)
-                print('❔ Confirm...')
+                word_list = clean_text.split(' ')
+                index = word_list.index('say')
+
+                pre_phrase = word_list[index + 1: index + 1 + self.phraseLength]
+                self.phrase = ' '.join(pre_phrase)
+                self.command_questions("🗣️  You said: " + self.phrase +
+                                       "\n\nSay 'confirm' to continue"
+                                       "\n\nSay 'say' followed by your phrase to edit")
             
             # Check for confirmation if a phrase was set
             if self.phrase is not None:
                 if 'confirm' in clean_text:
-                    print('✅ Phrase confirmed:', self.phrase)
+                    self.command_answers('✅ Phrase confirmed: ' + self.phrase)
                     self.__switchToState(CMSTATE.ASK_ACTIVATION)
         
         elif self.state == CMSTATE.ASK_ACTIVATION:
 
             if 'yes' in clean_text:
                 self.needsActivation = True
-                print('🟢 Activation Needed')
+                self.command_answers('🟢 Activation Needed')
                 self.__switchToState(CMSTATE.ASK_TYPE)
             elif 'no' in clean_text:
                 self.needsActivation = False
-                print('🔴 Activation Not Needed')
+                self.command_answers('🔴 Activation Not Needed')
                 self.__switchToState(CMSTATE.ASK_TYPE)
         
         elif self.state == CMSTATE.ASK_TYPE:
 
             if 'shortcut' in clean_text:
                 self.type = 'shortcut'
-                print('🔑 Shortcut Selected')
+                self.command_answers('🔑 Shortcut Selected')
+                self.__switchToState(CMSTATE.KEY_INPUT_LOOP)
+            elif 'short cut' in clean_text:
+                self.type = 'shortcut'
+                self.command_answers('🔑 Shortcut Selected')
                 self.__switchToState(CMSTATE.KEY_INPUT_LOOP)
             elif 'macro' in clean_text:
                 self.type = 'macro'
-                print('⌨️ Macro Selected')
+                self.command_answers('⌨️ Macro Selected')
                 self.__switchToState(CMSTATE.KEY_INPUT_LOOP)
 
         elif self.state == CMSTATE.KEY_INPUT_LOOP:
@@ -229,10 +266,14 @@ class CommandMaker:
 
                         if self.keyLoader is not None:
                             self.keys.append(self.keyLoader)
-                            print('➕', self.keyLoader)
+                            self.command_answers('➕ ' + self.keyLoader)
+                            self.command_questions("Say 'done' if you are finished or the name of a different key" \
+                                                   "\n\ne.g. 'enter', 'control', 'letter a', 'number 9'")
                             self.keyLoader = None
                         else:
-                            print('✖️ No key specified')
+                            self.command_questions('✖️ No key specified' \
+                            '\n\nSay the name of the key to add' \
+                            "\n\ne.g. 'enter', 'control', 'letter a', 'number 9'")
 
                     elif phrase_in_map == 'done':
 
@@ -244,17 +285,15 @@ class CommandMaker:
                             }
                         }
 
-                        print('...')
-                        print('New Command:')
-                        print(new_command)
-
                         self.finalized_command = new_command
                         
                         self.__switchToState(CMSTATE.DONE)
                     
                     else:
                         self.keyLoader = key
-                        print('🚩 Loaded:', key)
+                        self.command_questions('🗣️ You said: ' + key + \
+                                               "\n\nSay 'confirm' to add or the name of a different key"
+                                               "\n\nSay 'done' if you are finished")
                     
                     break
 
@@ -262,7 +301,6 @@ class CommandMaker:
             self.state = CMSTATE.IDLE
             returned = self.finalized_command.copy()
             self.__clearCommandMaker()
-            print('✨ Command Created :)')
             return returned
 
         return None

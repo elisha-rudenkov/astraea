@@ -10,6 +10,9 @@ from PyQt6 import QtCore, QtWidgets, QtGui
 
 from typing import Optional
 
+from .transcription_overlay import TextDisplayWidget
+from .command_maker import CommandMaker
+
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
     def pixelMetric(self, metric, option, widget):
@@ -26,55 +29,6 @@ class CustomGraphicsItem(QGraphicsRectItem):
         self.setRect(0, 0, width, height)
         self.setBrush(QColor(color))
 
-# Overlay window to display live transcription
-class OverlayWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        # Set window flags
-        self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint | # Always on top of other window
-            Qt.WindowType.FramelessWindowHint |  # Removes window frame
-            Qt.WindowType.Tool |                 # Window not shown on taskbar
-            Qt.WindowType.BypassWindowManagerHint # Don't let window manager handle this window
-        )
-
-        # Set background as transparent
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        # Make the cursor able to click through the overlay
-        self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, True)
-
-        # Set size and position
-        self.setGeometry(0, 50, 400, 80)
-        desktop = QApplication.primaryScreen().geometry()
-        self.move(desktop.width() - self.width() - 20, 20)
-
-        timer = QTimer()
-        timer.timeout.connect(self.paintEvent)
-        timer.start(30)
-
-    def paintEvent(self, event : QPaintEvent):
-        # Custom paint event to draw the overlay rectangle
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        dirty_rect = event.rect()
-        painter.drawRect(dirty_rect)
-
-        print("painted!")
-
-        # Draw semi-transparent background
-        # painter.setBrush(QColor(40, 40, 40, 180))  # Dark gray with alpha
-        # painter.setPen(QPen(QColor(60, 60, 220), 2))  # Blue border
-        # painter.drawRoundedRect(0, 0, self.width() - 1, self.height() - 1, 10, 10)
-
-        # # Draw text (Change to live transcription - WIP)
-        # painter.setPen(QColor(255, 255, 255))  # White text
-        # font = painter.font()
-        # font.setPointSize(12)
-        # painter.setFont(font)
-        # painter.drawText(10, 30, "Transcription line 1")
-        # painter.drawText(10, 60, "Transcription line 2")
 
 # Main window for Astrea
 class MainWindow(QMainWindow):
@@ -88,10 +42,6 @@ class MainWindow(QMainWindow):
         self.value_labels = {}
 
         self.init_ui()
-
-        # Create overlay window
-        self.overlay_window = OverlayWindow()
-        self.overlay_window.show()
 
     def register_mouse_controller(self, controller):
         #Register the mouse controller to allow adjusting its settings
@@ -188,11 +138,14 @@ class MainWindow(QMainWindow):
         self.setup_menu_bar()
 
         # Show the window
-        self.showMaximized()
+        #self.showMaximized()
 
-        from command_settings import InfoOverlay
-        self.overlay = InfoOverlay(self)
-        self.overlay.show_overlay()
+        # Hidden window for making commands
+        self.command_maker = CommandMaker()
+
+        # Create overlay window
+        self.transcription_box = TextDisplayWidget()
+        self.transcription_box.show()
 
     def create_home_page(self):
         # Create the home page and add components
