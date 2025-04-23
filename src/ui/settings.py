@@ -8,6 +8,11 @@ from PyQt6.QtCore import Qt, QPoint, QSize
 from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase, QPixmap, QMouseEvent, QPalette
 from PyQt6 import QtCore, QtWidgets, QtGui
 
+from typing import Optional
+
+from .transcription_overlay import TextDisplayWidget
+from .command_maker import CommandMaker
+
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
     def pixelMetric(self, metric, option, widget):
@@ -36,48 +41,7 @@ class CustomGraphicsItem(QGraphicsRectItem):
         
         painter.drawRoundedRect(self.rect(), self.border_radius, self.border_radius)
 
-# Overlay window to display live transcription
-class OverlayWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        # Set window flags
-        self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint | # Always on top of other window
-            Qt.WindowType.FramelessWindowHint |  # Removes window frame
-            Qt.WindowType.Tool |                 # Window not shown on taskbar
-            Qt.WindowType.BypassWindowManagerHint # Don't let window manager handle this window
-        )
-
-        # Set background as transparent
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        # Make the cursor able to click through the overlay
-        self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, True)
-
-        # Set size and position
-        self.setGeometry(0, 50, 400, 80)
-        desktop = QApplication.primaryScreen().geometry()
-        self.move(desktop.width() - self.width() - 20, 20)
-
-    def paintEvent(self, event):
-        # Custom paint event to draw the overlay rectangle
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Draw semi-transparent background
-        painter.setBrush(QColor(40, 40, 40, 180))  # Dark gray with alpha
-        painter.setPen(QPen(QColor(60, 60, 220), 2))  # Blue border
-        painter.drawRoundedRect(0, 0, self.width() - 1, self.height() - 1, 10, 10)
-
-        # Draw text (Change to live transcription - WIP)
-        painter.setPen(QColor(255, 255, 255))  # White text
-        font = painter.font()
-        font.setPointSize(12)
-        painter.setFont(font)
-        painter.drawText(10, 30, "Transcription line 1")
-        painter.drawText(10, 60, "Transcription line 2")
-
-# Create a custom titlebar class
+# Create custom titlebar class
 class CustomTitleBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -197,16 +161,12 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
 
-        # Create overlay window
-        self.overlay_window = OverlayWindow()
-        self.overlay_window.show()
-
     def register_mouse_controller(self, controller):
         #Register the mouse controller to allow adjusting its settings
         self.mouse_controller = controller
         # Initialize sliders with current value
         self.update_sliders_from_controller()
-
+    
     def update_sliders_from_controller(self):
         if not self.mouse_controller:
             return
@@ -258,7 +218,7 @@ class MainWindow(QMainWindow):
         # Register callback for calibration button
         self.calibrate_button.clicked.disconnect()
         self.calibrate_button.clicked.connect(callback)
-    
+
     def update_calibration_status(self, is_calibrated, values=None):
         # Update the calibration status display
         if is_calibrated:
@@ -353,6 +313,13 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.home_page)
         self.stacked_widget.addWidget(self.settings_page)
         self.stacked_widget.addWidget(self.help_page)
+
+        # Hidden window for making commands
+        self.command_maker = CommandMaker()
+
+        # Create overlay window
+        self.transcription_box = TextDisplayWidget()
+        self.transcription_box.show()
 
         # Show the window
         self.showMaximized()
@@ -578,16 +545,16 @@ class MainWindow(QMainWindow):
         
         # Add up multiplier slider
         up_label, up_row, up_value = self.create_slider_with_label(
-            "Upward Sensitivity", 5, 30, 20, "up_multiplier", 
-            lambda value: self.update_controller_value("up_multiplier", value/10, float)
+            "Upward Sensitivity", 5, 30, 5, "up_multiplier", 
+            lambda value: self.update_controller_value("up_multiplier", value, float)
         )
         vert_layout.addWidget(up_label)
         vert_layout.addWidget(up_row)
         
         # Add down multiplier slider
         down_label, down_row, down_value = self.create_slider_with_label(
-            "Downward Sensitivity", 5, 30, 20, "down_multiplier", 
-            lambda value: self.update_controller_value("down_multiplier", value/10, float)
+            "Downward Sensitivity", 5, 30, 5, "down_multiplier", 
+            lambda value: self.update_controller_value("down_multiplier", value, float)
         )
         vert_layout.addWidget(down_label)
         vert_layout.addWidget(down_row)
@@ -705,7 +672,7 @@ class MainWindow(QMainWindow):
         # Reset all sliders to their default values
         if self.mouse_controller:
             # Set default values
-            self.mouse_controller.base_speed = 8.0
+            self.mouse_controller.base_speed = 30.0
             self.mouse_controller.max_speed = 40.0
             self.mouse_controller.exp_factor = 1.5
             self.mouse_controller.up_multiplier = 2.0
@@ -716,7 +683,7 @@ class MainWindow(QMainWindow):
             
             # Update sliders to reflect default values
             self.update_sliders_from_controller()
-    
+
     def create_help_page(self):
         # Create the help page and add components
         self.help_page = QWidget()
@@ -817,39 +784,6 @@ class MainWindow(QMainWindow):
         # Add stretch to push everything to the top and center
         help_layout.addStretch()
 
-    def change_help_content(self, topic):
-        # Change content based on selected topic and update button styles
-        for button in self.topic_buttons:
-            button.setStyleSheet("""
-                QPushButton {
-                    text-align: left;
-                    padding: 15px;
-                    font-size: 16px;
-                    border: none;
-                    background-color: #CFDAE9;
-                }
-                QPushButton:hover {
-                    background-color: #B4C3D7;
-                }
-                QPushButton:pressed {
-                    background-color: #0288D1;
-                }
-            """)
-        
-        # Find the button for this topic and highlight it
-        for button in self.topic_buttons:
-            if button.text() == topic:
-                button.setStyleSheet(button.styleSheet() +
-                                    "QPushButton { background-color: #0288D1; color: white; }")
-                
-        # Set the selected page
-        if topic == "Getting Started":
-            self.help_content.setCurrentIndex(0)
-
-    def create_getting_started_page(self):
-        # Create the Getting Started page content
-        pass
-    
     def setup_menu_bar(self):
         # Configure menu bar with navigation actions
         menu_bar = self.menuBar()
@@ -896,13 +830,13 @@ class MainWindow(QMainWindow):
         elif button_text == "Calibrate (C)":
             # This is handled by the registered callback
             pass
-    
+
     def toggle_overlay(self):
         # Toggle the overlay window on button click
-        if self.overlay_window.isVisible():
-            self.overlay_window.close()
+        if self.transcription_box.isVisible():
+            self.transcription_box.close()
         else:
-            self.overlay_window.show()
+            self.transcription_box.show()
 
     def no_cam_err_msg(self):
         # Create a black pixmap
@@ -929,7 +863,7 @@ class MainWindow(QMainWindow):
         import logging
         logger = logging.getLogger(__name__)
         logger.error("Camera not detected or disconnected")
-
+        
     def get_menu_bar_style(self):
         # Return CSS stylesheet for menu bar
         return """
@@ -998,7 +932,7 @@ class MainWindow(QMainWindow):
                 border-radius: 10px;            /* Rounded corners for the track */
             }
         """
-
+    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
