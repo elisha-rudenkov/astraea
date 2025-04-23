@@ -106,6 +106,10 @@ class MainWindow(QMainWindow):
         # Show the window
         self.show()
 
+        from command_settings import InfoOverlay
+        self.overlay = InfoOverlay(self)
+        self.overlay.show_overlay()
+
     def create_home_page(self):
         # Create the home page and add components
         self.home_page = QWidget()
