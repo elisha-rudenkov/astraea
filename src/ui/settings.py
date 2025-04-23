@@ -147,6 +147,8 @@ class MainWindow(QMainWindow):
         self.transcription_box = TextDisplayWidget()
         self.transcription_box.show()
 
+        self.show()
+
     def create_home_page(self):
         # Create the home page and add components
         self.home_page = QWidget()

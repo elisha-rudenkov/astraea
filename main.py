@@ -94,7 +94,6 @@ def main():
 
     # Register calibration function to button
     window.register_calibrate_callback(calibrate)
-    window.show()
 
     def update_frame():
         nonlocal last_analysis_result, calibration_text
