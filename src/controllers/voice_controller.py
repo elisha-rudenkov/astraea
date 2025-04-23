@@ -29,7 +29,29 @@ from collections.abc import Callable    # Function type hinting
 import json                             # Loading in custom commands
 from jsonschema import validate, ValidationError
 
-# TODO: Validate incoming keys and make PR.
+from . import command_controller as cm
+
+'''
+Make a button that opens an overlay
+The overlay asks 'How many words for your phrase?'
+    User says 'number __'
+    'Confirm'
+Phrase?
+    Gets the (#) of words in the beginning of a phrase
+    'Confirm'
+Needs activation?
+    'Yes' or 'No'
+    'Confirm'
+Type?
+    'shortcut' or 'macro'
+    'Confirm'
+Keys?
+    'control' 'Confirm' etc.
+    'Done'
+
+'''
+
+
 
 class SpeechToCommand:
     SAMPLE_RATE = 16000                         # Whisper model works off 16kHz
@@ -37,9 +59,20 @@ class SpeechToCommand:
     MODEL_CLS : type[Whisper] = WhisperTinyEn   # Model classifiation
 
     isActive : bool = False                     # Determines whether commands are executed or not
+    isMakingCommand : bool = False              # Determines whether a command making process is going
     isMousePaused : bool = False                # Determines if mouse is paused by voice commands
+ 
+    def __init__(self, 
+                 transcription : Callable, 
+                 command_questions : Callable,
+                 command_answers : Callable,
+                 command_window : Callable,
+                 cb_calibrate : Callable = None, 
+                 debugMode : bool = True):
+        
+        self.transcription = transcription
+        self.command_window = command_window
 
-    def __init__(self, cb_calibrate : Callable, debugMode : bool = False):
         # Queue of input words to be read
         self.audio_queue = queue.Queue()
 
@@ -48,6 +81,9 @@ class SpeechToCommand:
 
         # Instance of the transcribing app
         self.app = WhisperApp(SpeechToCommand.MODEL_CLS.from_pretrained())
+
+        # Instance of the command maker
+        self.commandMaker = cm.CommandMaker(command_questions, command_answers)
 
         # Turns on/off the print debug
         self.debugMode = debugMode
@@ -65,11 +101,13 @@ class SpeechToCommand:
         self.commands['pause mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', True))
         self.commands['resume mouse'] = lambda : self.__perform_if_active(lambda: setattr(self, 'isMousePaused', False))
 
-        self.commands['start listening'] = lambda: (print('Commands enabled ✔️'), setattr(self, 'isActive', True))
-        self.commands['stop listening'] = lambda: (print('Commands disabled ❌'), setattr(self, 'isActive', False))
+        self.commands['start listening'] = lambda: (self.transcription('Commands enabled ✔️'), setattr(self, 'isActive', True))
+        self.commands['stop listening'] = lambda: (self.transcription('Commands disabled ❌'), setattr(self, 'isActive', False))
 
         # Callbacks for recalibrating
         self.commands['calibrate'] = lambda : self.__perform_if_active(cb_calibrate)
+
+        self.commands['create command'] = lambda : self.__perform_if_active(self.__speechMakeCommand)
 
         '''
         Commands are stored in JSON with the format:
@@ -90,40 +128,7 @@ class SpeechToCommand:
             customCommands : dict = json.load(f)
 
             for newCommand, info in customCommands.items():
-                
-                # Check if there's no command under that phrase
-                if newCommand not in self.commands:
-
-                    # Do not attempt to read the command info if it's incomplete
-                    if not self.__isCommandFormatted(info):
-                        continue
-
-                    # Get command information
-                    needsActivation : bool = info['needsActivation']
-                    inputType : str = info['type']
-                    inputKeys : list[str] = info['keys']
-
-                    
-
-                    # Loads the command correctly based on information
-                    commandMap = {
-                        (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
-                        (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
-                        (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
-                        (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
-                    }
-
-                    formattedCommand = commandMap.get((needsActivation, inputType), None)
-                    
-                    # Skip command if anything if can't match with a command format
-                    if formattedCommand is None:
-                        continue
-
-                    self.commands[newCommand] = formattedCommand
-
-                else:
-                    # Skip commands that already have the same name
-                    continue
+                self.__loadInCommand(newCommand, info)
 
     
     # Returns if the provided JSON written command info is formatted correctly
@@ -149,14 +154,52 @@ class SpeechToCommand:
         
         # Passed all tests
         return True
-
-
         
     # Only allows a command to activate if the voice module is on
     def __perform_if_active(self, action : Callable):
         if self.isActive:
             return action()
         return lambda : None # no-op (no operation)
+
+    def __loadInCommand(self, newCommand : str, info : dict):
+        # Check if there's no command under that phrase
+        if newCommand not in self.commands:
+
+            # Do not attempt to read the command info if it's incomplete
+            if not self.__isCommandFormatted(info):
+                return
+
+            # Get command information
+            needsActivation : bool = info['needsActivation']
+            inputType : str = info['type']
+            inputKeys : list[str] = info['keys']
+
+
+            # Loads the command correctly based on information
+            commandMap = {
+                (True, 'shortcut') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.hotkey(k)),
+                (True, 'macro') : lambda k=inputKeys : self.__perform_if_active(lambda: pyautogui.press(k)),
+                (False, 'shortcut') : lambda k=inputKeys: pyautogui.hotkey(k),
+                (False, 'macro'): lambda k=inputKeys : pyautogui.press(k)
+            }
+
+            formattedCommand = commandMap.get((needsActivation, inputType), None)
+            
+            # Skip command if anything if can't match with a command format
+            if formattedCommand is None:
+                return
+
+            self.commands[newCommand] = formattedCommand
+
+        else:
+            # Skip commands that already have the same name
+            return
+
+    def __speechMakeCommand(self):
+        self.isMakingCommand = True
+        self.command_window(True)
+
+
 
     # Method to be used on a separate thread for constant audio input
     def __record_audio(self):
@@ -167,7 +210,7 @@ class SpeechToCommand:
             self.audio_queue.put(indata.flatten())
 
         if self.debugMode:
-            print('Listening for speech 🗣')
+            self.transcription('Listening for speech 🗣')
 
         # duration * sample_rate is number of snapshots total over the duration
         # record in float32 for the model
@@ -196,22 +239,52 @@ class SpeechToCommand:
                 transcription = self.app.transcribe(audio_chunk, self.SAMPLE_RATE)
                 clean_text = transcription.translate(self.translator).lower()
 
-                print(clean_text)
+                self.transcription('… ' + clean_text)
 
-                # Check commands; Only one command can activate at a time
-                for phrase, command in self.commands.items():
-                    if phrase in clean_text:
-                        command()
-                        break
-
+                # Only activate commands if we're not making one
+                if not self.isMakingCommand:
+                    self.__checkForCommandUsage(clean_text)
+                else:
+                    self.__checkCommandCreation(clean_text)
+  
             # Keeps thread alive with 10ms delay for performance
             time.sleep(0.01)
+
+    # Check commands; Only one command can activate at a time
+    def __checkForCommandUsage(self, clean_text : str):
+        for phrase, command in self.commands.items():
+            if phrase in clean_text:
+                command()
+                break   
+
+    # Walks through the command process
+    def __checkCommandCreation(self, clean_text : str):
+        # Adds the command that was created once done
+        newCommand = self.commandMaker.makerHandler(clean_text)
+        if newCommand is not None:
+            cleanCommand = next(iter(newCommand.items()))
+            self.__loadInCommand(cleanCommand[0], cleanCommand[1])
+
+            with open('src\\commands.json', 'r+') as f:
+                commands : dict
+                commands = json.load(f)
+                commands.update(newCommand)
+
+                f.seek(0)
+                json.dump(commands, f, indent=4, separators=(', ', ': '))
+                f.truncate()
+
+            self.isMakingCommand = False
+            self.command_window(False)
+            self.transcription('✨ Command Created')
+
+
 
     # Starts all the threads
     def start(self):
 
         if self.debugMode:
-            print('STC booting up... 🔴')
+            self.transcription('STC booting up... 🔴')
 
         record_thread = threading.Thread(target=self.__record_audio, daemon=True)
         transcribe_thread = threading.Thread(target=self.__transcribe_audio, daemon=True)
@@ -220,4 +293,4 @@ class SpeechToCommand:
         transcribe_thread.start()
 
         if self.debugMode:
-            print('STC online 🟢.')
+            self.transcription('STC online 🟢')

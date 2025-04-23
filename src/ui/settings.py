@@ -2,10 +2,16 @@ import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QToolBar, QTextEdit, QWidget, QSlider,
                               QLabel, QFormLayout, QVBoxLayout, QPushButton, QHBoxLayout, 
                               QTabWidget, QStackedWidget, QGraphicsRectItem, QGraphicsScene,
-                              QGraphicsView, QGraphicsTextItem, QGraphicsProxyWidget)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QColor
+                              QGraphicsView, QGraphicsTextItem, QGraphicsProxyWidget, QScrollArea, 
+                              QGroupBox, QHBoxLayout)
+from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtGui import QAction, QColor, QPainter, QPen, QFont, QFontDatabase, QPaintEvent
 from PyQt6 import QtCore, QtWidgets, QtGui
+
+from typing import Optional
+
+from .transcription_overlay import TextDisplayWidget
+from .command_maker import CommandMaker
 
 # Custom proxy style to adjust the slider appearance
 class SliderProxyStyle(QtWidgets.QProxyStyle):
@@ -102,6 +108,13 @@ class MainWindow(QMainWindow):
 
         # Configure menu bar
         self.setup_menu_bar()
+
+        # Hidden window for making commands
+        self.command_maker = CommandMaker()
+
+        # Create overlay window
+        self.transcription_box = TextDisplayWidget()
+        self.transcription_box.show()
 
         # Show the window
         self.show()

@@ -62,12 +62,22 @@ def main():
 
 
     logger.info("Initializing application...")
+
+    # Initialize UI
+    app = QApplication(sys.argv)
+    window = MainWindow()
+
     face_detector = FaceDetector(use_gpu=use_gpu)
     landmark_analyzer = FaceLandmarkAnalyzer(use_gpu=use_gpu)
     mouse_controller = MouseController()
-    voice_controller = SpeechToCommand(calibrate)
-    voice_controller.start()
-    
+    voice_controller = SpeechToCommand(
+        window.transcription_box.update_text,
+        window.command_maker.update_walkthrough,
+        window.command_maker.update_answers,
+        window.command_maker.show_overlay,
+        cb_calibrate=calibrate,
+    )
+    voice_controller.start()    
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -79,10 +89,6 @@ def main():
     last_analysis_result = None
     calibrated = False
     calibration_text = "Press 'C' when ready to calibrate"
-
-    # Initialize UI
-    app = QApplication(sys.argv)
-    window = MainWindow()
 
     window.register_mouse_controller(mouse_controller)
 
@@ -146,9 +152,6 @@ def main():
                             cv2.putText(frame, "MOVEMENT PAUSED", (10, 130),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                             
-                        # Update UI with head position data
-                        # (Needs to be implemented in settings file)
-                        window.update_head_position_display(pitch,yaw,roll)
 
                     except Exception as e:
                         logger.error(f"Error displaying results: {str(e)}")
