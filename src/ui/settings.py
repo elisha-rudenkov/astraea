@@ -13,19 +13,49 @@ from typing import Optional
 from .transcription_overlay import TextDisplayWidget
 from .command_maker import CommandMaker
 
-# Custom proxy style to adjust the slider appearance
-class SliderProxyStyle(QtWidgets.QProxyStyle):
-    def pixelMetric(self, metric, option, widget):
-        if metric == QtWidgets.QStyle.PixelMetric.PM_SliderThickness:
-            return 100
-        elif metric == QtWidgets.QStyle.PixelMetric.PM_SliderLength:
-            return 80
-        return super().pixelMetric(metric, option, widget)
+# Responsive layout helper class
+class ResponsiveLayout:
+    def __init__(self, base_width=1920, base_height=1080):
+        """Initialize the responsive layout system with base resolution"""
+        self.base_width = base_width
+        self.base_height = base_height
+        self.update_scale_factors()
+        
+    def update_scale_factors(self):
+        """Update scale factors based on current screen resolution"""
+        screen = QApplication.primaryScreen()
+        screen_size = screen.size()
+        self.width_scale = screen_size.width() / self.base_width
+        self.height_scale = screen_size.height() / self.base_height
+        
+    def scale_pos(self, x, y):
+        """Scale a position based on current screen size"""
+        return int(x * self.width_scale), int(y * self.height_scale)
+    
+    def scale_size(self, width, height):
+        """Scale a size based on current screen size"""
+        return int(width * self.width_scale), int(height * self.height_scale)
+    
+    def scale_font_size(self, size):
+        """Scale a font size based on current screen size"""
+        # Using the smaller scale factor to ensure text remains readable
+        scale = min(self.width_scale, self.height_scale)
+        return int(size * scale)
+    
+    def scale_margin(self, margin):
+        """Scale a margin or padding value"""
+        scale = min(self.width_scale, self.height_scale)
+        return int(margin * scale)
 
-# Custom graphics rectangle with specified dimensions and color
 class CustomGraphicsItem(QGraphicsRectItem):
-    def __init__(self, width, height, color, border_radius=10, border_color="#C5CFF4", border_width=2):
+    def __init__(self, width, height, color, border_radius=10, border_color="#C5CFF4", border_width=2, responsive=None):
         super().__init__()
+        
+        if responsive:
+            width, height = responsive.scale_size(width, height)
+            border_radius = responsive.scale_margin(border_radius)
+            border_width = responsive.scale_margin(border_width)
+            
         self.setRect(0, 0, width, height)
         self.color = QColor(color)
         self.border_radius = border_radius
@@ -36,16 +66,31 @@ class CustomGraphicsItem(QGraphicsRectItem):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(self.color)
         
-        # Set the pen for the border (instead of NoPen)
+        # Set the pen for the border
         painter.setPen(QPen(self.border_color, self.border_width))
         
         painter.drawRoundedRect(self.rect(), self.border_radius, self.border_radius)
 
+# Custom proxy style to adjust the slider appearance
+class SliderProxyStyle(QtWidgets.QProxyStyle):
+    def __init__(self, style, responsive):
+        super().__init__(style)
+        self.responsive = responsive
+        
+    def pixelMetric(self, metric, option, widget):
+        if metric == QtWidgets.QStyle.PixelMetric.PM_SliderThickness:
+            return self.responsive.scale_size(100, 100)[0]
+        elif metric == QtWidgets.QStyle.PixelMetric.PM_SliderLength:
+            return self.responsive.scale_size(80, 80)[0]
+        return super().pixelMetric(metric, option, widget)
+
 # Create custom titlebar class
 class CustomTitleBar(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, responsive=None):
         super().__init__(parent)
         self.parent = parent
+        self.responsive = responsive
+        
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
@@ -53,7 +98,13 @@ class CustomTitleBar(QWidget):
         # Style the titlebar
         self.setAutoFillBackground(True)
         self.setBackgroundRole(QPalette.ColorRole.Window)
-        self.setMaximumHeight(40)
+        
+        if responsive:
+            height = responsive.scale_size(0, 40)[1]
+            self.setMaximumHeight(height)
+        else:
+            self.setMaximumHeight(40)
+            
         self.setStyleSheet("""
             background-color: transparent;
             color: white;
@@ -65,14 +116,27 @@ class CustomTitleBar(QWidget):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # Construct the full path to the logo
         logo_path = os.path.join(current_dir, 'logo.png')
-        self.logo = QLabel()
-        self.logo.setPixmap(QPixmap(logo_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        self.logo.setStyleSheet("margin-left: 10px; margin-right: 10px;")
+        
+        logo_size = 32
+        if responsive:
+            logo_size = responsive.scale_size(32, 32)[0]
+            
+        self.logo.setPixmap(QPixmap(logo_path).scaled(logo_size, logo_size, 
+                                                     Qt.AspectRatioMode.KeepAspectRatio, 
+                                                     Qt.TransformationMode.SmoothTransformation))
+        
+        margin = 10
+        if responsive:
+            margin = responsive.scale_margin(10)
+        self.logo.setStyleSheet(f"margin-left: {margin}px; margin-right: {margin}px;")
         self.layout.addWidget(self.logo)
         
-        # Add title
+        # Add title with responsive font size
         self.title = QLabel("ASTREA")
-        self.title.setStyleSheet("font-size: 20px; color: #A099ED;")
+        font_size = 20
+        if responsive:
+            font_size = responsive.scale_font_size(20)
+        self.title.setStyleSheet(f"font-size: {font_size}px; color: #A099ED;")
         font = QFont("Constantia")
         self.title.setFont(font)
         self.layout.addWidget(self.title)
@@ -80,43 +144,58 @@ class CustomTitleBar(QWidget):
         # Add spacer
         self.layout.addStretch()
         
+        # Create responsive button size
+        button_size = 60
+        if responsive:
+            button_size = responsive.scale_size(60, 40)[0]
+            
         # Add minimize button
-        self.min_button = QPushButton("─")
-        self.min_button.setFixedSize(40, 40)
-        self.min_button.setStyleSheet("""
-            QPushButton {
+        self.min_button = QPushButton("−")
+        self.min_button.setFixedSize(button_size, button_size)
+        
+        # Set responsive font size for buttons
+        button_font_size = 16
+        if responsive:
+            button_font_size = responsive.scale_font_size(25)
+            
+        # Titlebar button style
+        titlebar_button_style = f"""
+            QPushButton {{
                 background-color: transparent;
                 color: white;
                 border: none;
-                font-size: 18px;
-            }
-            QPushButton:hover {
+                font-size: {button_font_size}px;
+                font-family: 'Segoe UI', Arial;
+                font-weight: bold;
+                padding-bottom: 15px;
+            }}
+        """
+        
+        # Style for minimize and maximize buttons
+        self.min_button.setStyleSheet(f"""
+            {titlebar_button_style}
+            QPushButton:hover {{
                 background-color: #3D4F84;
-            }
+            }}
         """)
         self.min_button.clicked.connect(self.show_minimized)
         self.layout.addWidget(self.min_button)
         
         # Add maximize/restore button
         self.max_button = QPushButton("□")
-        self.max_button.setFixedSize(40, 40)
+        self.max_button.setFixedSize(button_size, button_size)
         self.max_button.setStyleSheet(self.min_button.styleSheet())
         self.max_button.clicked.connect(self.toggle_maximize_restore)
         self.layout.addWidget(self.max_button)
         
         # Add close button
         self.close_button = QPushButton("×")
-        self.close_button.setFixedSize(40, 40)
-        self.close_button.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: white;
-                border: none;
-                font-size: 18px;
-            }
-            QPushButton:hover {
+        self.close_button.setFixedSize(button_size, button_size)
+        self.close_button.setStyleSheet(f"""
+            {titlebar_button_style}
+            QPushButton:hover {{
                 background-color: #e81123;
-            }
+            }}
         """)
         self.close_button.clicked.connect(self.close_window)
         self.layout.addWidget(self.close_button)
@@ -141,12 +220,27 @@ class CustomTitleBar(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.mouse_pos = event.globalPosition().toPoint()
-    
+        elif event.button() == Qt.MouseButton.RightButton:
+            self.show_context_menu(event.globalPosition().toPoint())
+
     def mouseMoveEvent(self, event):
         if self.mouse_pos:
-            delta = event.globalPosition().toPoint() - self.mouse_pos
-            self.parent.move(self.parent.x() + delta.x(), self.parent.y() + delta.y())
-            self.mouse_pos = event.globalPosition().toPoint()
+            if event.buttons() == Qt.MouseButton.LeftButton:
+                # Use native window move behavior
+                if self.parent.windowHandle():
+                    self.parent.windowHandle().startSystemMove()
+                self.mouse_pos = None  # Reset after initiating move
+    
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.toggle_maximize_restore()
+
+    def show_context_menu(self, global_pos):
+        menu = QtWidgets.QMenu(self)
+        menu.addAction("Minimize", self.show_minimized)
+        menu.addAction("Maximize/Restore", self.toggle_maximize_restore)
+        menu.addAction("Close", self.close_window)
+        menu.exec(global_pos)    
 
 # Main window for Astrea
 class MainWindow(QMainWindow):
@@ -158,8 +252,20 @@ class MainWindow(QMainWindow):
         # Dictionaries to store slider and label references
         self.sliders = {}
         self.value_labels = {}
+        
+        # Initialize responsive layout helper
+        self.responsive = ResponsiveLayout()
+        
+        # Connect resize event to update layout
+        self.resizeEvent = self.on_resize
 
         self.init_ui()
+
+    def on_resize(self, event):
+        """Handle the resize event to update the responsive layout"""
+        self.responsive.update_scale_factors()
+        # Update layouts that need to be responsive
+        super().resizeEvent(event)
 
     def register_mouse_controller(self, controller):
         #Register the mouse controller to allow adjusting its settings
@@ -216,7 +322,8 @@ class MainWindow(QMainWindow):
 
     def register_calibrate_callback(self, callback):
         # Register callback for calibration button
-        self.calibrate_button.clicked.disconnect()
+        if hasattr(self, 'calibrate_button') and self.calibrate_button.receivers(self.calibrate_button.clicked) > 0:
+            self.calibrate_button.clicked.disconnect()
         self.calibrate_button.clicked.connect(callback)
 
     def update_calibration_status(self, is_calibrated, values=None):
@@ -247,7 +354,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         # Initialize the user interface components
         self.setWindowTitle('Astrea')
-        self.setMinimumWidth(200)
+        self.setMinimumWidth(self.responsive.scale_size(200, 0)[0])
 
         # Hide the default titlebar
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -261,14 +368,14 @@ class MainWindow(QMainWindow):
         container_layout.setSpacing(0)
         
         # Create and add custom titlebar
-        self.title_bar = CustomTitleBar(self)
+        self.title_bar = CustomTitleBar(self, self.responsive)
         container_layout.addWidget(self.title_bar)
         
         # Create the separator line
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
-        separator.setLineWidth(10)
+        separator.setLineWidth(self.responsive.scale_margin(10))
         separator.setStyleSheet("background-color:#3D4F84;")
         container_layout.addWidget(separator)
 
@@ -335,14 +442,96 @@ class MainWindow(QMainWindow):
         view = QGraphicsView(scene)
         view.setFrameStyle(QtWidgets.QFrame.Shape.NoFrame)  # Removes the frame
 
-        # Add video feed box
-        video_box = CustomGraphicsItem(750, 595, "#B6BEDF", border_radius=10)
-        video_box.setPos(100, 100)
+        # Calculate scene size based on screen size
+        screen_rect = QApplication.primaryScreen().availableGeometry()
+        scene_width = screen_rect.width() * 0.95
+        scene_height = screen_rect.height() * 0.85
+        
+        # Calculate total available height
+        available_height = scene_height * 0.80
+        
+        # Add voice commands box first
+        voice_cmd_width = scene_width * 0.35
+        voice_cmd_height = scene_height * 0.7
+        voice_cmd_box = CustomGraphicsItem(voice_cmd_width, voice_cmd_height, "#B6BEDF", 
+                                        border_radius=self.responsive.scale_margin(10))
+        
+        # Position voice command box
+        voice_cmd_x = scene_width * 0.6
+        voice_cmd_y = scene_height * 0.05
+        voice_cmd_box.setPos(voice_cmd_x, voice_cmd_y)
+        scene.addItem(voice_cmd_box)
+        
+        # Add voice commands label
+        voice_label = QGraphicsTextItem("Voice Commands")
+        voice_label.setDefaultTextColor(Qt.GlobalColor.black)
+        font_size = self.responsive.scale_font_size(18)
+        voice_label_font = QFont("Segoe UI", font_size, QFont.Weight.Bold)
+        voice_label.setFont(voice_label_font)
+
+        # Position the label at the top center of the voice commands box
+        label_x = voice_cmd_box.x() + (voice_cmd_box.rect().width() - voice_label.boundingRect().width()) / 2
+        label_y = voice_cmd_box.y() + self.responsive.scale_margin(10)
+        voice_label.setPos(label_x, label_y)
+        scene.addItem(voice_label)
+
+        # Add calibration status box second
+        calib_width = voice_cmd_width
+        calib_height = scene_height * 0.2
+        calib_box = CustomGraphicsItem(calib_width, calib_height, "#B6BEDF", 
+                                    border_radius=self.responsive.scale_margin(10))
+        
+        # Position calibration box below voice commands box
+        calib_x = voice_cmd_x
+        calib_y = voice_cmd_box.y() + voice_cmd_height + self.responsive.scale_margin(30)
+        calib_box.setPos(calib_x, calib_y)
+        scene.addItem(calib_box)
+
+        # Add calibration status title
+        calib_title = QGraphicsTextItem("Calibration Status")
+        calib_title.setDefaultTextColor(Qt.GlobalColor.black)
+        calib_title.setFont(voice_label_font)
+        
+        # Position the title at the top center of the calibration box
+        calib_title_x = calib_box.x() + (calib_box.rect().width() - calib_title.boundingRect().width()) / 2
+        calib_title_y = calib_box.y() + self.responsive.scale_margin(10)  # Margin from top of box
+        calib_title.setPos(calib_title_x, calib_title_y)
+        scene.addItem(calib_title)
+        
+        # Add video feed box to fit between the top of voice commands and bottom of calibration
+        # Calculate the vertical position and height for video feed
+        video_top_offset = self.responsive.scale_margin(100)  # Space below voice commands top edge
+        video_bottom_offset = self.responsive.scale_margin(20)  # Space above calibration status bottom edge
+        
+        video_box_y = voice_cmd_y + video_top_offset
+        total_available_height = (calib_y + calib_height) - video_box_y - video_bottom_offset
+        
+        video_box_width = scene_width * 0.5
+        video_box_height = scene_height * 0.70
+        video_box = CustomGraphicsItem(video_box_width, video_box_height, "#B6BEDF", 
+                                    border_radius=self.responsive.scale_margin(10))
+        
+        # Position video box to the left of voice commands
+        video_box_x = scene_width * 0.05
+        video_box.setPos(video_box_x, video_box_y)
         scene.addItem(video_box)
 
+        # Add video feed label
+        video_label = QGraphicsTextItem("Video Feed")
+        video_label.setDefaultTextColor(Qt.GlobalColor.black)
+        video_label.setFont(voice_label_font)
+
+        # Position the label at the top center of the video feed box
+        label_x = video_box.x() + (video_box.rect().width() - video_label.boundingRect().width()) / 2
+        label_y = video_box.y() + self.responsive.scale_margin(10)
+        video_label.setPos(label_x, label_y)
+        scene.addItem(video_label)
+
         # Create a QLabel for the video feed in the scene
+        video_label_width = video_box_width * 0.9
+        video_label_height = video_box_height * 0.8
         self.scene_video_label = QLabel()
-        self.scene_video_label.setFixedSize(700, 500)
+        self.scene_video_label.setFixedSize(int(video_label_width), int(video_label_height))
         self.scene_video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scene_video_label.setStyleSheet("background-color: transparent;")
         
@@ -351,77 +540,37 @@ class MainWindow(QMainWindow):
         proxy.setWidget(self.scene_video_label)
         
         # Position the video label inside the video box
-        proxy.setPos(video_box.pos() + QtCore.QPointF(25, 50))
+        proxy.setPos(video_box.pos() + QtCore.QPointF(video_box_width * 0.05, video_box_height * 0.1))
         scene.addItem(proxy)
 
-        # Add video feed label
-        video_label = QGraphicsTextItem("Video Feed")
-        video_label.setDefaultTextColor(Qt.GlobalColor.black)
-        video_label_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
-        video_label.setFont(video_label_font)
-
-        cmd_title = QGraphicsTextItem("Voice Commands")
-        cmd_title.setDefaultTextColor(Qt.GlobalColor.black)
-        cmd_title_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
-        cmd_title.setFont(cmd_title_font)
-
-        # Position the label at the top center of the video feed box
-        label_x = video_box.x() + (video_box.rect().width() - video_label.boundingRect().width()) / 2
-        label_y = video_box.y() + 10
-        video_label.setPos(label_x, label_y)
-        scene.addItem(video_label)
-
-        # Create calibration button
-        self.calibrate_button = QPushButton("Calibrate")
-        self.calibrate_button.setFont(QFont("Lucida Sans"))
-        self.calibrate_button.setFixedSize(150, 50)
-        self.calibrate_button.clicked.connect(self.on_button_clicked)
-        self.calibrate_button.setStyleSheet(self.get_button_style())
-
-        # Create a proxy widget for the button
-        calib_button_proxy = QGraphicsProxyWidget()
-        calib_button_proxy.setWidget(self.calibrate_button)
-        calib_button_proxy.setPos(550, 735)
-
-        self.calibrate_button.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        calib_button_proxy.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        scene.addItem(calib_button_proxy)
-
-        # Create overlay toggle button
-        self.overlay_button = QPushButton("Toggle Transcription Overlay")
-        self.overlay_button.setFont(QFont("Lucida Sans"))
-        self.overlay_button.setFixedSize(350, 50)
-        self.overlay_button.clicked.connect(self.toggle_overlay)
-        self.overlay_button.setStyleSheet(self.get_button_style())
-
-        # Create a proxy widget for the button
-        overlay_b_proxy = QGraphicsProxyWidget()
-        overlay_b_proxy.setWidget(self.overlay_button)
-        overlay_b_proxy.setPos(150, 735)
-
-        self.overlay_button.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        overlay_b_proxy.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-
-        scene.addItem(overlay_b_proxy)
-
-        # Add voice commands box
-        voice_cmd_box = CustomGraphicsItem(500, 600, "#B6BEDF", border_radius=10)
-        voice_cmd_box.setPos(900, 0)
-        scene.addItem(voice_cmd_box)
+        # Create calibration status label
+        self.calibration_status_label = QLabel("Not Calibrated")
+        status_font_size = self.responsive.scale_font_size(16)
+        self.calibration_status_label.setFont(QFont("Lucida Sans", status_font_size, QFont.Weight.Bold))
         
-        # Add label to voice commands box
-        cmd_title = QGraphicsTextItem("Voice Commands")
-        cmd_title.setDefaultTextColor(Qt.GlobalColor.black)
-        cmd_title_font = QFont("Segoe UI", 18, QFont.Weight.Bold)
-        cmd_title.setFont(cmd_title_font)
-
-        # Position the title at the top center of the box
-        cmd_title_x = voice_cmd_box.x() + (voice_cmd_box.rect().width() - cmd_title.boundingRect().width()) / 2
-        cmd_title_y = voice_cmd_box.y() + 15
-        cmd_title.setPos(cmd_title_x, cmd_title_y)
-        scene.addItem(cmd_title)
-
+        status_width, status_height = self.responsive.scale_size(300, 60)
+        self.calibration_status_label.setFixedSize(status_width, status_height)
+        self.calibration_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        border_radius = self.responsive.scale_margin(10)
+        padding = self.responsive.scale_margin(10)
+        self.calibration_status_label.setStyleSheet(f"""
+            background-color: #FFA500;
+            color: white;
+            border-radius: {border_radius}px;
+            padding: {padding}px;
+        """)
+        
+        # Create a proxy widget for the status label
+        status_label_proxy = QGraphicsProxyWidget()
+        status_label_proxy.setWidget(self.calibration_status_label)
+        
+        # Position the status label
+        status_x = calib_box.x() + (calib_box.rect().width() - status_width) / 2
+        status_y = calib_box.y() + calib_box.rect().height() / 2
+        status_label_proxy.setPos(status_x, status_y)
+        scene.addItem(status_label_proxy)
+        
         # List of voice commands
         commands = [
             "🗣️  \"Start listening\" – Activate voice commands",
@@ -435,11 +584,12 @@ class MainWindow(QMainWindow):
             "▶️  \"Resume mouse\" – Unfreeze cursor movement"
         ]
 
-        start_x = voice_cmd_box.x() + 30
-        start_y = voice_cmd_box.y() + 60
-        line_spacing = 40
+        start_x = voice_cmd_box.x() + self.responsive.scale_margin(30)
+        start_y = voice_cmd_box.y() + self.responsive.scale_margin(60)
+        line_spacing = self.responsive.scale_margin(40)
 
-        command_font = QFont("Segoe UI", 14)
+        command_font_size = self.responsive.scale_font_size(14)
+        command_font = QFont("Segoe UI", command_font_size)
 
         for i, command in enumerate(commands):
             cmd_item = QGraphicsTextItem(command)
@@ -448,41 +598,47 @@ class MainWindow(QMainWindow):
             cmd_item.setPos(start_x, start_y + i * line_spacing)
             scene.addItem(cmd_item)
 
-        # Add calibration status box
-        calib_box = CustomGraphicsItem(500, 150, "#B6BEDF", border_radius=10)
-        calib_box.setPos(900, 635)
-        scene.addItem(calib_box)
+        # Create calibration button
+        self.calibrate_button = QPushButton("Calibrate")
+        self.calibrate_button.setFont(QFont("Lucida Sans"))
+        button_width, button_height = self.responsive.scale_size(150, 50)
+        self.calibrate_button.setFixedSize(button_width, button_height)
+        self.calibrate_button.clicked.connect(self.on_button_clicked)
+        self.calibrate_button.setStyleSheet(self.get_button_style())
 
-        # Add calibration status title
-        calib_title = QGraphicsTextItem("Calibration Status")
-        calib_title.setDefaultTextColor(Qt.GlobalColor.black)
-        calib_title.setFont(cmd_title_font)
-        
-        # Position the title at the top center of the calibration box
-        calib_title_x = calib_box.x() + (calib_box.rect().width() - calib_title.boundingRect().width()) / 2
-        calib_title_y = calib_box.y() + 10  # Margin from top of box
-        calib_title.setPos(calib_title_x, calib_title_y)
-        scene.addItem(calib_title)
-        
-        # Create calibration status label
-        self.calibration_status_label = QLabel("Not Calibrated")
-        self.calibration_status_label.setFont(QFont("Lucida Sans", 16, QFont.Weight.Bold))
-        self.calibration_status_label.setFixedSize(300, 60)
-        self.calibration_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.calibration_status_label.setStyleSheet("""
-            background-color: #FFA500;
-            color: white;
-            border-radius: 10px;
-            padding: 10px;
-        """)
-        
-        # Create a proxy widget for the status label
-        status_label_proxy = QGraphicsProxyWidget()
-        status_label_proxy.setWidget(self.calibration_status_label)
-        status_label_proxy.setPos(calib_box.x() + (calib_box.rect().width() - self.calibration_status_label.width()) / 2, 
-                                calib_box.y() + 70)
-        scene.addItem(status_label_proxy)
+        # Create a proxy widget for the button
+        calib_button_proxy = QGraphicsProxyWidget()
+        calib_button_proxy.setWidget(self.calibrate_button)
+        calib_button_proxy.setPos(video_box.x() + video_box_width - button_width - self.responsive.scale_margin(250), 
+                                video_box.y() + video_box_height + self.responsive.scale_margin(40))
 
+        self.calibrate_button.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        calib_button_proxy.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        scene.addItem(calib_button_proxy)
+
+        # Create overlay toggle button
+        self.overlay_button = QPushButton("Toggle Transcription Overlay")
+        self.overlay_button.setFont(QFont("Lucida Sans"))
+        overlay_button_width, overlay_button_height = self.responsive.scale_size(350, 50)
+        self.overlay_button.setFixedSize(overlay_button_width, overlay_button_height)
+        self.overlay_button.clicked.connect(self.toggle_overlay)
+        self.overlay_button.setStyleSheet(self.get_button_style())
+
+        # Create a proxy widget for the button
+        overlay_b_proxy = QGraphicsProxyWidget()
+        overlay_b_proxy.setWidget(self.overlay_button)
+        overlay_b_proxy.setPos(video_box.x() + self.responsive.scale_margin(75), 
+                            video_box.y() + video_box_height + self.responsive.scale_margin(40))
+
+        self.overlay_button.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        overlay_b_proxy.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        scene.addItem(overlay_b_proxy)
+
+        # Set view size to match available area
+        view.setSceneRect(0, 0, scene_width, scene_height)
+        
         home_layout.addRow(view)
     
     def create_settings_page(self):
@@ -507,7 +663,24 @@ class MainWindow(QMainWindow):
 
         # Create group box for cursor speed settings
         speed_group = QGroupBox("Cursor Speed Settings")
-        speed_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
+        
+        # Scale font size for group box
+        font_size = self.responsive.scale_font_size(16)
+        border_width = self.responsive.scale_margin(2)
+        padding_top = self.responsive.scale_margin(15)
+        margin_top = self.responsive.scale_margin(10)
+        
+        speed_group.setStyleSheet(f"""
+            QGroupBox {{ 
+                font-size: {font_size}pt; 
+                font-weight: bold; 
+                color: #162552; 
+                border: {border_width}px solid #B6BEDF; 
+                padding-top: {padding_top}px; 
+                margin-top: {margin_top}px; 
+            }}
+        """)
+        
         speed_layout = QVBoxLayout()
         speed_group.setLayout(speed_layout)
         content_layout.addWidget(speed_group)
@@ -520,6 +693,9 @@ class MainWindow(QMainWindow):
         speed_layout.addWidget(base_speed_label)
         speed_layout.addWidget(base_speed_row)
         
+        # Apply responsive spacing between sliders
+        speed_layout.addSpacing(self.responsive.scale_margin(15))
+        
         # Add max speed slider
         max_speed_label, max_speed_row, max_speed_value = self.create_slider_with_label(
             "Max Speed", 10, 100, 40, "max_speed", 
@@ -527,6 +703,7 @@ class MainWindow(QMainWindow):
         )
         speed_layout.addWidget(max_speed_label)
         speed_layout.addWidget(max_speed_row)
+        speed_layout.addSpacing(self.responsive.scale_margin(15))
         
         # Add acceleration slider
         accel_label, accel_row, accel_value = self.create_slider_with_label(
@@ -538,7 +715,18 @@ class MainWindow(QMainWindow):
         
         # Create group box for vertical sensitivity settings
         vert_group = QGroupBox("Vertical Sensitivity Settings")
-        vert_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
+        # Apply responsive styling to the group box
+        vert_group.setStyleSheet(f"""
+            QGroupBox {{ 
+                font-size: {font_size}pt; 
+                font-weight: bold; 
+                color: #162552; 
+                border: {border_width}px solid #B6BEDF; 
+                padding-top: {padding_top}px; 
+                margin-top: {margin_top}px; 
+            }}
+        """)
+        
         vert_layout = QVBoxLayout()
         vert_group.setLayout(vert_layout)
         content_layout.addWidget(vert_group)
@@ -550,6 +738,7 @@ class MainWindow(QMainWindow):
         )
         vert_layout.addWidget(up_label)
         vert_layout.addWidget(up_row)
+        vert_layout.addSpacing(self.responsive.scale_margin(15))
         
         # Add down multiplier slider
         down_label, down_row, down_value = self.create_slider_with_label(
@@ -561,7 +750,18 @@ class MainWindow(QMainWindow):
         
         # Create group box for threshold settings
         threshold_group = QGroupBox("Threshold Settings")
-        threshold_group.setStyleSheet("QGroupBox { font-size: 16pt; font-weight: bold; color: #162552; border: 2px solid #B6BEDF; padding-top: 15px; margin-top: 10px; }")
+        # Apply responsive styling to the group box
+        threshold_group.setStyleSheet(f"""
+            QGroupBox {{ 
+                font-size: {font_size}pt; 
+                font-weight: bold; 
+                color: #162552; 
+                border: {border_width}px solid #B6BEDF; 
+                padding-top: {padding_top}px; 
+                margin-top: {margin_top}px; 
+            }}
+        """)
+        
         threshold_layout = QVBoxLayout()
         threshold_group.setLayout(threshold_layout)
         content_layout.addWidget(threshold_group)
@@ -573,6 +773,7 @@ class MainWindow(QMainWindow):
         )
         threshold_layout.addWidget(movement_label)
         threshold_layout.addWidget(movement_row)
+        threshold_layout.addSpacing(self.responsive.scale_margin(15))
         
         # Add click threshold slider
         click_label, click_row, click_value = self.create_slider_with_label(
@@ -581,6 +782,7 @@ class MainWindow(QMainWindow):
         )
         threshold_layout.addWidget(click_label)
         threshold_layout.addWidget(click_row)
+        threshold_layout.addSpacing(self.responsive.scale_margin(15))
         
         # Add click cooldown slider
         cooldown_label, cooldown_row, cooldown_value = self.create_slider_with_label(
@@ -590,24 +792,29 @@ class MainWindow(QMainWindow):
         threshold_layout.addWidget(cooldown_label)
         threshold_layout.addWidget(cooldown_row)
         
-        # Add spacer at the bottom
-        content_layout.addSpacing(20)
+        # Add spacer at the bottom with responsive height
+        content_layout.addSpacing(self.responsive.scale_margin(20))
         
-        # Add reset button at the bottom
+        # Add reset button at the bottom with responsive sizing
         reset_button = QPushButton("Reset to Default Settings")
-        reset_button.setFixedSize(300, 50)
-        reset_button.setFont(QFont("Lucida Sans"))
+        reset_button_width, reset_button_height = self.responsive.scale_size(300, 50)
+        reset_button.setFixedSize(reset_button_width, reset_button_height)
+        font = QFont("Lucida Sans")
+        font.setPointSize(self.responsive.scale_font_size(12))
+        reset_button.setFont(font)
         reset_button.setStyleSheet(self.get_button_style())
         reset_button.clicked.connect(self.reset_to_default)
-        content_layout.addWidget(reset_button)
+        content_layout.addWidget(reset_button, 0, Qt.AlignmentFlag.AlignCenter)
 
         # Save the base speed slider for backwards compatibility
         self.sensitivity_slider = self.sliders.get('base_speed')
 
     def create_slider_with_label(self, label_text, min_val, max_val, default_val, key, callback_func):
-        # Create label
+        # Create label with responsive font size
         slider_label = QLabel(label_text)
-        slider_label.setStyleSheet("font-size: 14pt; margin-top: 10px;")
+        font_size = self.responsive.scale_font_size(14)
+        margin_top = self.responsive.scale_margin(10)
+        slider_label.setStyleSheet(f"font-size: {font_size}pt; margin-top: {margin_top}px;")
 
         # Create horizontal layout for slider and value
         slider_row = QHBoxLayout()
@@ -619,16 +826,20 @@ class MainWindow(QMainWindow):
         slider.setSingleStep(1)
         slider.setPageStep(2)
         slider.setTickPosition(QSlider.TickPosition.TicksAbove)
-        slider.setMaximumWidth(600)
         
-        # Apply custom style to slider
-        style = SliderProxyStyle(slider.style())
+        # Set responsive maximum width
+        slider_width = self.responsive.scale_size(600, 0)[0]
+        slider.setMaximumWidth(slider_width)
+        
+        # Apply custom style with responsive sizing
+        style = SliderProxyStyle(slider.style(), self.responsive)
         slider.setStyle(style)
         slider.setStyleSheet(self.get_slider_style())
         
-        # Create value label
+        # Create value label with responsive font size
         value_label = QLabel(f"{label_text}: {default_val}")
-        value_label.setStyleSheet("font-size: 12pt;")
+        value_font_size = self.responsive.scale_font_size(12)
+        value_label.setStyleSheet(f"font-size: {value_font_size}pt;")
 
         # Add slider and value label to the row layout
         slider_row.addWidget(slider, 85)
@@ -690,10 +901,13 @@ class MainWindow(QMainWindow):
         help_layout = QVBoxLayout()
         self.help_page.setLayout(help_layout)
         
-        # Create title label centered at the top
+        # Create title label centered at the top with responsive font size
         title = QLabel("Getting Started")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 40px; font-weight: bold; margin: 20px 0 40px 0; color: #162552;")
+        title_font_size = self.responsive.scale_font_size(40)
+        margin_value = self.responsive.scale_margin(20)
+        bottom_margin = self.responsive.scale_margin(40)
+        title.setStyleSheet(f"font-size: {title_font_size}px; font-weight: bold; margin: {margin_value}px 0 {bottom_margin}px 0; color: #162552;")
         help_layout.addWidget(title)
         
         # Create container for the boxes
@@ -709,48 +923,63 @@ class MainWindow(QMainWindow):
             ("4", "Use voice commands for clicking and other functions", "#162552")
         ]
         
-        # Create each step box
+        # Create each step box with responsive dimensions
         for number, text, color in steps:
-            # Create the box widget
+            # Create the box widget with responsive width
+            box_width = self.responsive.scale_size(300, 0)[0]
             box = QWidget()
-            box.setFixedWidth(300)
+            box.setFixedWidth(box_width)
             box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            
+            # Apply responsive styling
+            border_radius = self.responsive.scale_margin(15)
+            padding = self.responsive.scale_margin(20)
+            min_height = self.responsive.scale_size(0, 150)[1]
+            border_width = self.responsive.scale_margin(2)
+            
             box.setStyleSheet(f"""
                 background-color: #B6BEDF;
-                border-radius: 15px;
-                padding: 20px 15px;
-                min-height: 150px;
-                border: 2px solid #C5CFF4;
+                border-radius: {border_radius}px;
+                padding: {padding}px {padding - 5}px;
+                min-height: {min_height}px;
+                border: {border_width}px solid #C5CFF4;
             """)
             
             box_layout = QVBoxLayout()
-            box_layout.setContentsMargins(15, 15, 15, 15)
-            box_layout.setSpacing(15)
+            margin = self.responsive.scale_margin(15)
+            box_layout.setContentsMargins(margin, margin, margin, margin)
+            box_layout.setSpacing(margin)
             box.setLayout(box_layout)
             
+            # Create number view with responsive dimensions
+            circle_size = self.responsive.scale_size(100, 100)
             number_view = QGraphicsView()
-            number_view.setFixedSize(100, 100)
+            number_view.setFixedSize(circle_size[0], circle_size[1])
             number_view.setStyleSheet("background: transparent; border: none;")
             number_view.setRenderHint(QPainter.RenderHint.Antialiasing)
             number_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             number_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             number_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            # Create the scene
+            # Create the scene with responsive dimensions
+            scene_size = self.responsive.scale_size(80, 80)
+            scene_offset = scene_size[0] / 2
             number_scene = QGraphicsScene()
-            number_scene.setSceneRect(-40, -40, 80, 80)
+            number_scene.setSceneRect(-scene_offset, -scene_offset, scene_size[0], scene_size[1])
             number_view.setScene(number_scene)
 
-            # Create the circle centered in the scene
-            circle = QGraphicsEllipseItem(-30, -30, 60, 60)
+            # Create the circle centered in the scene with responsive dimensions
+            circle_radius = self.responsive.scale_size(60, 60)[0] / 2
+            circle = QGraphicsEllipseItem(-circle_radius, -circle_radius, circle_radius * 2, circle_radius * 2)
             circle.setBrush(QColor(color))
             circle.setPen(QPen(Qt.PenStyle.NoPen))
             number_scene.addItem(circle)
 
-            # Add number text
+            # Add number text with responsive font size
             text_item = QGraphicsTextItem(number)
             text_item.setDefaultTextColor(QColor(255, 255, 255))
-            text_item.setFont(QFont("Lucida Sans", 24, QFont.Weight.Bold))
+            font_size = self.responsive.scale_font_size(24)
+            text_item.setFont(QFont("Lucida Sans", font_size, QFont.Weight.Bold))
 
             # Position the text in the center of the circle
             text_rect = text_item.boundingRect()
@@ -761,11 +990,13 @@ class MainWindow(QMainWindow):
             number_scene.addItem(text_item)
             box_layout.addWidget(number_view, 0, Qt.AlignmentFlag.AlignCenter)
             
-            # Create step text
+            # Create step text with responsive styling
             text_label = QLabel(text)
             text_label.setWordWrap(True)
             text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            text_label.setStyleSheet("font-size: 20px; margin-top: 15px; color: #000000; line-height: 1.4;")
+            text_font_size = self.responsive.scale_font_size(20)
+            margin_top = self.responsive.scale_margin(15)
+            text_label.setStyleSheet(f"font-size: {text_font_size}px; margin-top: {margin_top}px; color: #000000; line-height: 1.4;")
             text_label.setFont(QFont("Fira Sans"))
             box_layout.addWidget(text_label)
             
@@ -775,10 +1006,12 @@ class MainWindow(QMainWindow):
             # Add box to container with some margin
             boxes_layout.addWidget(box)
             if number != "4":  # Don't add spacing after the last box
-                boxes_layout.addSpacing(20)
+                box_spacing = self.responsive.scale_margin(20)
+                boxes_layout.addSpacing(box_spacing)
         
-        # Add the boxes container to the main layout
-        boxes_container.setStyleSheet("margin-top: 30px;")
+        # Add the boxes container to the main layout with responsive margin
+        margin_top = self.responsive.scale_margin(30)
+        boxes_container.setStyleSheet(f"margin-top: {margin_top}px;")
         help_layout.addWidget(boxes_container)
         
         # Add stretch to push everything to the top and center
@@ -833,25 +1066,32 @@ class MainWindow(QMainWindow):
 
     def toggle_overlay(self):
         # Toggle the overlay window on button click
-        if self.transcription_box.isVisible():
+        if hasattr(self, 'transcription_box') and self.transcription_box and self.transcription_box.isVisible():
             self.transcription_box.close()
         else:
-            self.transcription_box.show()
+            if hasattr(self, 'transcription_box') and self.transcription_box:
+                self.transcription_box.show()
 
     def no_cam_err_msg(self):
-        # Create a black pixmap
-        pixmap = QPixmap(700, 500)
+        # Create a black pixmap with responsive dimensions
+        width, height = self.responsive.scale_size(700, 500)
+        pixmap = QPixmap(width, height)
         pixmap.fill(QColor(0, 0, 0))
 
-        # Use painter to draw on the pixmap
+        # Use painter to draw on the pixmap with responsive font sizes
         painter = QPainter(pixmap)
         painter.setPen(QColor(255, 0, 0))
-        painter.setFont(QFont('Arial', 20))
+        
+        main_font_size = self.responsive.scale_font_size(20)
+        sub_font_size = self.responsive.scale_font_size(16)
+        
+        painter.setFont(QFont('Arial', main_font_size))
         painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "No camera detected")
 
-        painter.setFont(QFont('Arial', 16))
+        painter.setFont(QFont('Arial', sub_font_size))
         rect = pixmap.rect()
-        rect.translate(0, 40)  # Move down for second line
+        vertical_offset = self.responsive.scale_size(0, 40)[1]
+        rect.translate(0, vertical_offset)  # Move down for second line with responsive distance
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "Please connect a camera and restart the app")
         painter.end()
 
@@ -866,75 +1106,88 @@ class MainWindow(QMainWindow):
         
     def get_menu_bar_style(self):
         # Return CSS stylesheet for menu bar
-        return """
-            QMenuBar {
-                min-height: 30px;
-                font-size: 16pt;
+        min_height = self.responsive.scale_size(0, 30)[1]
+        font_size = self.responsive.scale_font_size(16)
+        padding_v = self.responsive.scale_margin(10)
+        padding_h = self.responsive.scale_margin(20)
+        margin = self.responsive.scale_margin(5)
+        border_radius = self.responsive.scale_margin(5)
+        
+        return f"""
+            QMenuBar {{
+                min-height: {min_height}px;
+                font-size: {font_size}pt;
                 background-color: #162552;
-            }
-            QMenuBar::item {
-                padding: 10px 20px;
-                margin: 5px;
+            }}
+            QMenuBar::item {{
+                padding: {padding_v}px {padding_h}px;
+                margin: {margin}px;
                 background-color: transparent;
                 color: #B8B8B8;
-            }
-            QMenuBar::item:selected {
+            }}
+            QMenuBar::item:selected {{
                 background-color: #3D4F84;
                 color: white;
-                border-radius: 5px;
-            }
+                border-radius: {border_radius}px;
+            }}
         """
 
     def get_button_style(self):
-        # Return CSS stylesheet for control buttons
-        return """
-            QPushButton {
-                background-color: #3A356F; /* Blue background */
-                color: white;              /* White text */
-                border-radius: 15px;       /* Rounded corners */
-                font-weight: bold;         /* Bold text */
-                font-size: 20px;           /* Larger text */
-                border: none;              /* No border */
-                text-align: center;        /* Center text horizontally */
-                padding: 8px;              /* Add some padding */
-            }
-            QPushButton:hover {
-                background-color: #6661A1; /* Lighter blue when hovering */
-            }
-            QPushButton:pressed {
-                background-color: #2E295E; /* Darker blue when pressed */
-            }
+        # Return CSS stylesheet for buttons with responsive dimensions
+        font_size = self.responsive.scale_font_size(20)
+        border_radius = self.responsive.scale_margin(15)
+        padding = self.responsive.scale_margin(8)
+        
+        return f"""
+            QPushButton {{
+                background-color: #3A356F;
+                color: white;
+                border-radius: {border_radius}px;
+                font-weight: bold;
+                font-size: {font_size}px;
+                border: none;
+                text-align: center;
+                padding: {padding}px;
+            }}
+            QPushButton:hover {{
+                background-color: #6661A1;
+            }}
+            QPushButton:pressed {{
+                background-color: #2E295E;
+            }}
         """
     
     def get_slider_style(self):
-        # Return CSS stylesheet for slider control
-        return """
-            QSlider::handle:horizontal {
+        # Return CSS stylesheet for slider control with responsive dimensions
+        handle_width = self.responsive.scale_size(85, 0)[0]
+        handle_height = self.responsive.scale_size(80, 0)[1]
+        handle_margin = self.responsive.scale_margin(30)
+        handle_radius = self.responsive.scale_margin(40)
+        
+        track_height = self.responsive.scale_size(0, 30)[1]
+        track_radius = self.responsive.scale_margin(10)
+        
+        return f"""
+            QSlider::handle:horizontal {{
                 background: #FCD88B;
-                width: 85px;
-                height: 80px;
-                margin: -30px 0px;
-                border-radius: 40px;
-            }
-            QSlider::add-page:horizontal {
-                background: #B6BEDF;            /* Color for the right side of the handle */
-                border-radius: 10px;
-                height: 10px;
-            }
-            QSlider::sub-page:horizontal {
-                background: #EDCB80;            /* Color for the left side of the handle */
-                border-radius: 10px;
-                height: 10px;
-            }
-            QSlider::groove:horizontal {
-                height: 30px;                   /* Make the track/groove thicker */
-                background: #d3d3d3;            /* Light gray background for the track */
-                border-radius: 10px;            /* Rounded corners for the track */
-            }
+                width: {handle_width}px;
+                height: {handle_height}px;
+                margin: -{handle_margin}px 0px;
+                border-radius: {handle_radius}px;
+            }}
+            QSlider::add-page:horizontal {{
+                background: #B6BEDF;
+                border-radius: {track_radius}px;
+                height: {track_height / 3}px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: #EDCB80;
+                border-radius: {track_radius}px;
+                height: {track_height / 3}px;
+            }}
+            QSlider::groove:horizontal {{
+                height: {track_height}px;
+                background: #d3d3d3;
+                border-radius: {track_radius}px;
+            }}
         """
-    
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
