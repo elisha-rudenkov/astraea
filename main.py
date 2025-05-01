@@ -50,13 +50,12 @@ def main():
         return  # Exit after benchmarking
     
     def calibrate():
-        nonlocal calibrated, calibration_text
+        nonlocal calibrated
         if last_analysis_result is not None:
             mouse_controller.calibrate(last_analysis_result)
             logger.info("Calibration complete!")
             window.update_calibration_status(True, last_analysis_result)
             calibrated = True
-            calibration_text = "Calibration complete!"
         else:
             logger.warning("No analysis data available for calibration.")
 
@@ -88,7 +87,6 @@ def main():
     # Initialize state variables
     last_analysis_result = None
     calibrated = False
-    calibration_text = "Press 'C' when ready to calibrate"
 
     window.register_mouse_controller(mouse_controller)
 
@@ -96,7 +94,7 @@ def main():
     window.register_calibrate_callback(calibrate)
 
     def update_frame():
-        nonlocal last_analysis_result, calibration_text
+        nonlocal last_analysis_result
 
         ret, frame = cap.read()
         if not ret:
@@ -138,13 +136,11 @@ def main():
                         roll = analysis_result['roll']
                         
                         # Display information on frame
-                        cv2.putText(frame, calibration_text, (10, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 60),
+                        cv2.putText(frame, f"Pitch: {pitch:>6.1f}deg", (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 80),
+                        cv2.putText(frame, f"Yaw: {yaw:>6.1f}deg", (10, 50),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 100),
+                        cv2.putText(frame, f"Roll: {roll:>6.1f}deg", (10, 70),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                         
                         # Display pause status
