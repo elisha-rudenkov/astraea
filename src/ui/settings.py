@@ -582,6 +582,7 @@ class MainWindow(QMainWindow):
             "🎯  \"Calibrate\" – Calibrate the cursor",
             "⏸️  \"Pause mouse\" – Freeze cursor movement",
             "▶️  \"Resume mouse\" – Unfreeze cursor movement"
+            "⚙️  \"Create command\" – Open the command creator wizard"
         ]
 
         start_x = voice_cmd_box.x() + self.responsive.scale_margin(30)
