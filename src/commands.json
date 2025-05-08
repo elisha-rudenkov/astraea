@@ -8,10 +8,5 @@
         "needsActivation": true,
         "type": "shortcut",
         "keys": ["ctrl","v"]
-    },
-    "easter egg": {
-        "needsActivation": false,
-        "type": "macro",
-        "keys": ["e", "a", "s", "t", "e", "r", " ", "e", "g", "g"]
     }
 }

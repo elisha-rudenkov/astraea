@@ -2,17 +2,14 @@
 
 Empower hands-free computer navigation using facial gestures and voice commands.
 
-Astraea is a Windows application that transforms head movements, eye states, and voice commands into computer controls, designed for individuals with motor disabilities. Built with optimized AI models, it leverages on-device processing for real-time, privacy-focused accessibility.
+Astraea is a Windows application that transforms head movements and voice commands into computer controls, designed for individuals with motor disabilities. Built with optimized Qualcomm AI models, it leverages on-device processing for real-time, privacy-focused accessibility.
 
 ## Key Features ✨
 
 * **Face-Driven Cursor:** Map head movements to mouse navigation using advanced face detection.
-* **Eye Gesture Controls:**
-  * Left Click: Hold eyes closed for 1-2 seconds
-  * Right Click: Double-blink detection (two rapid closures)
 * **Voice Commands:**
   * Control mouse movement and clicks
-  * Execute custom commands
+  * Execute and create custom shortcuts/macros commands
   * Pause/resume mouse control
 * **Low-Latency Performance:** Optimized for real-time processing
 * **Customizable UI:** Adjust sensitivity, calibration, and gesture thresholds
@@ -51,22 +48,21 @@ python main.py
 ```
 
 2. **Calibration:**
+   * Say 'Start Listening' for Astrea to start interpretting commands
    * Center your face in the virtual bounding box
-   * Press 'C' or use the Calibrate button in the UI
+   * Say 'Calibrate' or press 'C' on the keyboard
    * Adjust sensitivity settings as needed
 
 3. **Controls:**
    * Move your head to control the cursor
-   * Use eye gestures for clicks
-   * Use voice commands for additional control
-   * Press SPACE to temporarily pause mouse movement
+   * Use the listed voice commands for additional control
 
 4. **Voice Commands:**
    * "Pause mouse" - Temporarily disable mouse control
    * "Resume mouse" - Re-enable mouse control
-   * "Click" - Perform a left click
-   * "Right click" - Perform a right click
-   * Custom commands can be configured in the UI
+   * "Left" - Perform a left click
+   * "Right" - Perform a right click
+   * "Create Command" - Opens a walkthrough on how to make a custom shortcut/macro
 
 ## Tech Stack 🛠️
 
@@ -79,7 +75,7 @@ python main.py
   * Python with OpenCV for camera processing
   * PyQt6 for the user interface
   * ONNX Runtime for model inference
-  * Speech Recognition for voice commands
+  * Speech Recognition with Whisper AI for voice commands
 
 ## Privacy & Performance 🌟
 

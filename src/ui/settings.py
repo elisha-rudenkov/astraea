@@ -328,28 +328,9 @@ class MainWindow(QMainWindow):
 
     def update_calibration_status(self, is_calibrated, values=None):
         # Update the calibration status display
-        if is_calibrated:
-            self.calibration_status_label.setText("Calibrated")
-            self.calibration_status_label.setStyleSheet("""
-                background-color: #4CAF50; 
-                color: white;
-                border-radius: 10px;
-                border_radius=10
-                padding: 10px;
-                font-size: 16pt;
-                font-weight: bold;
-            """)
-        else:
-            self.calibration_status_label.setText("Not Calibrated")
-            self.calibration_status_label.setStyleSheet("""
-                background-color: #FFA500; 
-                color: white;
-                border-radius: 10px;
-                border_radius=10
-                padding: 10px;
-                font-size: 16pt;
-                font-weight: bold;
-            """)
+        self.calibration_status_label.setText("Calibrated")
+        self.calibration_status_label.setAutoFillBackground(True)
+        self.calibration_status_label.setPalette(QPalette(QColor("#4CAF50")))
     
     def init_ui(self):
         # Initialize the user interface components
@@ -500,19 +481,16 @@ class MainWindow(QMainWindow):
         
         # Add video feed box to fit between the top of voice commands and bottom of calibration
         # Calculate the vertical position and height for video feed
-        video_top_offset = self.responsive.scale_margin(100)  # Space below voice commands top edge
-        video_bottom_offset = self.responsive.scale_margin(20)  # Space above calibration status bottom edge
-        
-        video_box_y = voice_cmd_y + video_top_offset
-        total_available_height = (calib_y + calib_height) - video_box_y - video_bottom_offset
-        
+        # Set video box dimensions
         video_box_width = scene_width * 0.5
-        video_box_height = scene_height * 0.70
+        video_box_height = scene_height * 0.75  # Increase height to nearly full scene
+
+        # Center video box vertically
+        video_box_x = scene_width * 0.05
+        video_box_y = (scene_height - video_box_height) / 2
+
         video_box = CustomGraphicsItem(video_box_width, video_box_height, "#B6BEDF", 
                                     border_radius=self.responsive.scale_margin(10))
-        
-        # Position video box to the left of voice commands
-        video_box_x = scene_width * 0.05
         video_box.setPos(video_box_x, video_box_y)
         scene.addItem(video_box)
 
@@ -527,21 +505,25 @@ class MainWindow(QMainWindow):
         video_label.setPos(label_x, label_y)
         scene.addItem(video_label)
 
-        # Create a QLabel for the video feed in the scene
+        # Adjust video feed label (QLabel) to fill the box
         video_label_width = video_box_width * 0.9
-        video_label_height = video_box_height * 0.8
+        video_label_height = video_box_height * 0.85  # Nearly fill box, allow some padding
+
         self.scene_video_label = QLabel()
         self.scene_video_label.setFixedSize(int(video_label_width), int(video_label_height))
         self.scene_video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scene_video_label.setStyleSheet("background-color: transparent;")
-        
-        # Create a proxy widget to add the label to the scene
+
+        # Create a proxy widget to add the QLabel to the scene
         proxy = QGraphicsProxyWidget()
         proxy.setWidget(self.scene_video_label)
-        
-        # Position the video label inside the video box
-        proxy.setPos(video_box.pos() + QtCore.QPointF(video_box_width * 0.05, video_box_height * 0.1))
+
+        # Center QLabel in video box
+        proxy_x = video_box.x() + (video_box_width - video_label_width) / 2
+        proxy_y = video_box.y() + video_box_height * 0.1
+        proxy.setPos(proxy_x, proxy_y)
         scene.addItem(proxy)
+
 
         # Create calibration status label
         self.calibration_status_label = QLabel("Not Calibrated")
@@ -555,11 +537,13 @@ class MainWindow(QMainWindow):
         border_radius = self.responsive.scale_margin(10)
         padding = self.responsive.scale_margin(10)
         self.calibration_status_label.setStyleSheet(f"""
-            background-color: #FFA500;
             color: white;
             border-radius: {border_radius}px;
             padding: {padding}px;
         """)
+
+        self.calibration_status_label.setAutoFillBackground(True)
+        self.calibration_status_label.setPalette(QPalette(QColor("#FFA500")))
         
         # Create a proxy widget for the status label
         status_label_proxy = QGraphicsProxyWidget()
@@ -581,7 +565,7 @@ class MainWindow(QMainWindow):
             "🖱️  \"Release\" – Release held click",
             "🎯  \"Calibrate\" – Calibrate the cursor",
             "⏸️  \"Pause mouse\" – Freeze cursor movement",
-            "▶️  \"Resume mouse\" – Unfreeze cursor movement"
+            "▶️  \"Resume mouse\" – Unfreeze cursor movement",
             "⚙️  \"Create command\" – Open the command creator wizard"
         ]
 
