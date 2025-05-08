@@ -328,28 +328,9 @@ class MainWindow(QMainWindow):
 
     def update_calibration_status(self, is_calibrated, values=None):
         # Update the calibration status display
-        if is_calibrated:
-            self.calibration_status_label.setText("Calibrated")
-            self.calibration_status_label.setStyleSheet("""
-                background-color: #4CAF50; 
-                color: white;
-                border-radius: 10px;
-                border_radius=10
-                padding: 10px;
-                font-size: 16pt;
-                font-weight: bold;
-            """)
-        else:
-            self.calibration_status_label.setText("Not Calibrated")
-            self.calibration_status_label.setStyleSheet("""
-                background-color: #FFA500; 
-                color: white;
-                border-radius: 10px;
-                border_radius=10
-                padding: 10px;
-                font-size: 16pt;
-                font-weight: bold;
-            """)
+        self.calibration_status_label.setText("Calibrated")
+        self.calibration_status_label.setAutoFillBackground(True)
+        self.calibration_status_label.setPalette(QPalette(QColor("#4CAF50")))
     
     def init_ui(self):
         # Initialize the user interface components
@@ -556,11 +537,13 @@ class MainWindow(QMainWindow):
         border_radius = self.responsive.scale_margin(10)
         padding = self.responsive.scale_margin(10)
         self.calibration_status_label.setStyleSheet(f"""
-            background-color: #FFA500;
             color: white;
             border-radius: {border_radius}px;
             padding: {padding}px;
         """)
+
+        self.calibration_status_label.setAutoFillBackground(True)
+        self.calibration_status_label.setPalette(QPalette(QColor("#FFA500")))
         
         # Create a proxy widget for the status label
         status_label_proxy = QGraphicsProxyWidget()
