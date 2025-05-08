@@ -582,7 +582,7 @@ class MainWindow(QMainWindow):
             "🖱️  \"Release\" – Release held click",
             "🎯  \"Calibrate\" – Calibrate the cursor",
             "⏸️  \"Pause mouse\" – Freeze cursor movement",
-            "▶️  \"Resume mouse\" – Unfreeze cursor movement"
+            "▶️  \"Resume mouse\" – Unfreeze cursor movement",
             "⚙️  \"Create command\" – Open the command creator wizard"
         ]
 
